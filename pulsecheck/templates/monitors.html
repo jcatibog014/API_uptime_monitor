@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, empty, check_result, monitor_state %}
+{% from "_icons.html" import icon %}
+{% block title %}Monitors - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {% call page_head('Monitors') %}
+    {% if rows and room > 0 %}<a class="button" href="{{ url_for('monitors.new') }}">{{ icon('plus') }} Add monitor</a>{% endif %}
+  {% endcall %}
+
+  {% if not rows %}
+    {% call empty('No Monitors Yet', 'A monitor is an address that Pulse Check checks on a schedule: an API, a health page or a website.') %}
+      <a class="button" href="{{ url_for('monitors.new') }}">{{ icon('plus') }} Add monitor</a>
+    {% endcall %}
+  {% else %}
+    <div class="table-wrap">
+      <table class="fit-table">
+        <thead>
+          <tr><th>Monitor</th><th>Now</th><th class="num">Response</th><th>Checked</th><th>How Often</th></tr>
+        </thead>
+        <tbody>
+          {% for monitor, last in rows %}
+            <tr>
+              <td>
+                <a class="row-link" href="{{ url_for('monitors.page', monitor_id=monitor.id) }}">{{ monitor.name }}</a>
+                <span class="cell-sub address">{{ monitor.url }}</span>
+              </td>
+              <td>{% if monitor.paused or not last %}{{ monitor_state(monitor) }}{% else %}{{ check_result(last) }}{% endif %}</td>
+              <td class="num" data-label="Response">{% if last and last.ok %}{{ last.total_ms|ms }}{% else %}–{% endif %}</td>
+              <td data-label="Checked">{% if last %}{{ last.started_at|ago }}{% else %}Not yet{% endif %}</td>
+              <td data-label="How often">{{ monitor_interval(monitor) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if room <= 0 %}<p class="muted small top-gap">A workspace can have at most {{ rows|length }} monitors. Delete one to add another.</p>{% endif %}
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, field %}
+{% from "_icons.html" import logo %}
+{% from "_trace.html" import trace %}
+{% block title %}Log In - {{ APP_NAME }}{% endblock %}
+{% block layout %}
+  <div class="welcome" id="main">
+    {# The monitor: the name and the heartbeat, on its dark screen. #}
+    <section class="welcome-panel screen">
+      <a class="logo" href="{{ url_for('auth.login') }}">{{ logo(72) }} {{ APP_NAME }}</a>
+      <p class="welcome-line">{{ TAGLINE }}</p>
+      {{ trace() }}
+      <p class="welcome-note">Pulse Check checks your APIs every minute and tells you the moment one stops answering.</p>
+    </section>
+    <section class="welcome-stage">
+      <div class="card">
+        <h1>Log In</h1>
+        {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+        <form method="post" action="{{ url_for('auth.login') }}" class="stack">
+          {{ csrf() }}
+          <input type="hidden" name="next" value="{{ next }}">
+          {{ field('email', 'Email', email, type='email', attrs='autocomplete="email" required autofocus') }}
+          {{ field('password', 'Password', type='password', attrs='autocomplete="current-password" required') }}
+          <button class="button button-block" type="submit">Log in</button>
+        </form>
+      </div>
+      {% if has_page('demo.start') %}
+      <p class="or-line">or</p>
+      <div class="card demo-card">
+        <h2>Explore the Demo</h2>
+        <p>Your own sample monitors, deleted after 24 hours.</p>
+        <form method="post" action="{{ url_for('demo.start') }}">
+          {{ csrf() }}
+          <button class="button button-quiet button-block" type="submit">Try the demo</button>
+        </form>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

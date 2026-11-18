@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% from "_trace.html" import empty_trace %}
+{% block title %}{{ code }} - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  <section class="empty narrow top-gap">
+    {{ empty_trace() }}
+    <h2>{% if code == 404 %}Not Found{% elif code == 403 %}Not Allowed{% elif code == 429 %}Slow Down{% elif code == 409 %}Not Right Now{% else %}Something Went Wrong{% endif %}</h2>
+    <p>{{ message }}</p>
+    <a class="button" href="{{ url_for('auth.index') }}">{{ 'Back to the Dashboard' if g.user else 'Go to the start' }}</a>
+  </section>
+{% endblock %}

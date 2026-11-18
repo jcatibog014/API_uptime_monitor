@@ -1,0 +1,21 @@
+{# The heartbeat line (style.css .trace). The bright copy draws itself across the faint one, again
+   and again; flat=True is a flatline, red, for while a monitor is down. pathLength="100" lets the
+   CSS animate any length of line the same way. #}
+{% set BEAT = "M0 26 H26 Q31 20 36 26 H48 L52 30 L58 5 L64 35 L68 26 H82 Q90 17 98 26 H146 Q151 20 156 26 H168 L172 30 L178 5 L184 35 L188 26 H202 Q210 17 218 26 H240" %}
+{% set FLAT = "M0 26 H240" %}
+{% macro trace(flat=False, label=None) %}
+  <svg class="trace{% if flat %} is-flat{% endif %}" viewBox="0 0 240 40" preserveAspectRatio="none"{% if label %} role="img" aria-label="{{ label }}"{% else %} aria-hidden="true"{% endif %}>
+    <path class="trace-ghost" d="{{ FLAT if flat else BEAT }}" pathLength="100"></path>
+    <path class="trace-live" d="{{ FLAT if flat else BEAT }}" pathLength="100"></path>
+  </svg>
+{% endmacro %}
+
+{# One small beat for under page titles. #}
+{% macro title_trace() %}
+  <div class="title-trace" aria-hidden="true"><svg width="40" height="16" viewBox="0 0 40 16"><path d="M0 10 H8 L11 12 L15 2 L19 15 L22 10 H40"></path></svg></div>
+{% endmacro %}
+
+{# A quiet, flat line for empty pages. #}
+{% macro empty_trace() %}
+  <svg class="empty-trace" viewBox="0 0 240 40" aria-hidden="true"><path d="M0 26 H96 L100 28 L104 18 L108 32 L111 26 H240"></path></svg>
+{% endmacro %}

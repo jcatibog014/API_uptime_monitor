@@ -1,0 +1,129 @@
+"""The data model: one class per table.
+
+Every row that belongs to someone carries workspace_id (or hangs off a row
+that does, like a check off its monitor). There is the owner's workspace (the
+real one) and one sandbox workspace per Try Demo visitor, so a demo can never
+see or touch the owner's monitors, incidents or alerts.
+
+Times are naive UTC (dates.utcnow()). Ids of workspaces and users are never
+reused (sqlite_autoincrement), so an old demo cookie can't open a newer demo.
+Every foreign key has an index that STARTS with its column: deleting a demo
+cascades through thousands of checks, and without the index each one would
+scan the whole table.
+"""
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, false
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .dates import DEFAULT_ZONE, utcnow
+from .db import Base
+
+
+class Workspace(Base):
+    """One account's monitors: the owner's, or a demo's sandbox."""
+    __tablename__ = "workspaces"
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    demo_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+    time_zone: Mapped[str] = mapped_column(String(64), default=DEFAULT_ZONE, server_default=DEFAULT_ZONE)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    users: Mapped[list["User"]] = relationship(back_populates="workspace", cascade="all, delete-orphan",
+                                               passive_deletes=True)
+
+
+class User(Base):
+    """Someone who can log in. The owner (made with flask create-owner) or a demo visitor."""
+    __tablename__ = "users"
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    email: Mapped[str] = mapped_column(String(254), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Part of the login cookie. Changing it (a new password) logs out every other device.
+    session_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    workspace: Mapped[Workspace] = relationship(back_populates="users")
+
+    @property
+    def first_name(self):
+        return self.name.split()[0] if self.name else ""
+
+    @property
+    def initial(self):
+        return (self.name or "?")[:1].upper()
+
+
+class RateLimit(Base):
+    """One fixed window of tries (limits.py): "login-ip:1.2.3.4" has had 3 tries since 9:00."""
+    __tablename__ = "rate_limits"
+
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer)
+    window_start: Mapped[datetime] = mapped_column(DateTime)
+
+
+class Monitor(Base):
+    """One thing to check: an address, how to ask it, and what a good answer is."""
+    __tablename__ = "monitors"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    # "http" (an address on the web); later stages add "practice", "tcp" and "heartbeat".
+    kind: Mapped[str] = mapped_column(String(12), default="http", server_default="http")
+    url: Mapped[str] = mapped_column(String(2000), default="", server_default="")
+    method: Mapped[str] = mapped_column(String(8), default="GET", server_default="GET")
+    # Which answers count as up, like "200-299" or "200,204,301" (probe.parse_statuses).
+    expected_statuses: Mapped[str] = mapped_column(String(60), default="200-299", server_default="200-299")
+    timeout_s: Mapped[int] = mapped_column(Integer, default=10, server_default="10")
+    interval_s: Mapped[int] = mapped_column(Integer, default=60, server_default="60")
+    paused: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    workspace: Mapped[Workspace] = relationship()
+
+
+class Check(Base):
+    """One check of one monitor, with how long each part took.
+
+    scheduled_at is the moment the check was MEANT for. It is unique per
+    monitor, so a check job that runs twice (the queue promises at least once,
+    not exactly once) is still recorded once.
+    """
+    __tablename__ = "checks"
+    __table_args__ = (UniqueConstraint("monitor_id", "scheduled_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    monitor_id: Mapped[int] = mapped_column(ForeignKey("monitors.id", ondelete="CASCADE"))
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime)
+    started_at: Mapped[datetime] = mapped_column(DateTime)
+    ok: Mapped[bool] = mapped_column(Boolean)
+    # Up, but slower than the monitor's limit (a Slow Beat; stage 6).
+    slow: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Failed while Pulse Check's own connection was failing too: not counted (stage 3).
+    our_side: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Made by the Check now button, not the schedule.
+    manual: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    error_kind: Mapped[str | None] = mapped_column(String(20))
+    message: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    status_code: Mapped[int | None] = mapped_column(Integer)
+    remote_ip: Mapped[str | None] = mapped_column(String(45))
+    # Milliseconds for each part (None when the check never got that far).
+    dns_ms: Mapped[float | None] = mapped_column(Float)
+    connect_ms: Mapped[float | None] = mapped_column(Float)
+    tls_ms: Mapped[float | None] = mapped_column(Float)
+    ttfb_ms: Mapped[float | None] = mapped_column(Float)  # sent the request -> the first byte came back
+    total_ms: Mapped[float | None] = mapped_column(Float)
+
+    monitor: Mapped[Monitor] = relationship()

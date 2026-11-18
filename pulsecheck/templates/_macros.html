@@ -1,0 +1,71 @@
+{# Small building blocks used by many pages. #}
+{% from "_trace.html" import title_trace, empty_trace %}
+
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endmacro %}
+
+{% macro field(name, label, value='', error=None, type='text', hint=None, attrs='', note=None) %}
+  <label class="field{% if error %} has-error{% endif %}">
+    <span class="field-label">{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}</span>
+    <input type="{{ type }}" name="{{ name }}" value="{{ value if value is not none else '' }}" {{ attrs|safe }}
+           {% if error %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}>
+    {% if note %}<span class="field-note">{{ note }}</span>{% endif %}
+    {% if error %}<p class="field-error" id="{{ name }}-error">{{ error }}</p>{% endif %}
+  </label>
+{% endmacro %}
+
+{% macro select(name, label, choices, value=None, error=None, hint=None, attrs='') %}
+  {# choices: a list of (value, text) pairs #}
+  <label class="field{% if error %} has-error{% endif %}">
+    <span class="field-label">{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}</span>
+    <select name="{{ name }}" {{ attrs|safe }}{% if error %} aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}>
+      {% for choice, text in choices %}
+        <option value="{{ choice }}"{% if choice|string == value|string %} selected{% endif %}>{{ text }}</option>
+      {% endfor %}
+    </select>
+    {% if error %}<p class="field-error" id="{{ name }}-error">{{ error }}</p>{% endif %}
+  </label>
+{% endmacro %}
+
+{# A page title, bare (no line of text under it: the owner's rule), with a small heartbeat under it. #}
+{% macro page_head(title, back=None, back_label=None) %}
+  {% if back %}<a class="back-link" href="{{ back }}">&larr; {{ back_label or 'Back' }}</a>{% endif %}
+  <div class="page-head">
+    <h1>{{ title }}</h1>
+    {% if caller %}<div class="head-actions">{{ caller() }}</div>{% endif %}
+  </div>
+  {{ title_trace() }}
+{% endmacro %}
+
+{# A pulse stamp: the themed word, with its plain meaning when you point at it (and for screen readers). #}
+{% macro pulse(word, note=True) %}
+  <span class="pulse pulse-{{ word.tone }}"{% if word.note %} title="{{ word.note }}"{% endif %}>{{ word.label }}{% if note and word.note %}<span class="visually-hidden">: {{ word.note }}</span>{% endif %}</span>
+{% endmacro %}
+
+{% macro monitor_state(monitor) %}{{ pulse(pulse_state('paused' if monitor.paused else monitor_state_name(monitor))) }}{% endmacro %}
+{% macro check_result(check) %}{% if check %}{{ pulse(check_word(check)) }}{% else %}{{ pulse(pulse_state('new')) }}{% endif %}{% endmacro %}
+
+{# An empty page: a quiet monitor. #}
+{% macro empty(title, text=None) %}
+  <div class="empty">
+    {{ empty_trace() }}
+    <h2>{{ title }}</h2>
+    {% if text %}<p>{{ text }}</p>{% endif %}
+    {% if caller %}{{ caller() }}{% endif %}
+  </div>
+{% endmacro %}
+
+{# How long each part of a check took, as one split bar (widths are SVG attributes: the CSP allows those). #}
+{% macro phases(check) %}
+  {% if check and check.total_ms %}
+    {% set total = [check.total_ms, 1]|max %}
+    <svg class="phases" viewBox="0 0 100 10" preserveAspectRatio="none" role="img"
+         aria-label="DNS {{ check.dns_ms|ms }}, connect {{ check.connect_ms|ms }}, TLS {{ check.tls_ms|ms }}, wait {{ check.ttfb_ms|ms }}">
+      {% set x = namespace(at=0) %}
+      {% for part, cls in [(check.dns_ms, 'ph-dns'), (check.connect_ms, 'ph-connect'), (check.tls_ms, 'ph-tls'), (check.ttfb_ms, 'ph-wait')] %}
+        {% if part %}{% set width = 100 * part / total %}<rect class="{{ cls }}" x="{{ '%.2f'|format(x.at) }}" y="0" width="{{ '%.2f'|format(width) }}" height="10"></rect>{% set x.at = x.at + width %}{% endif %}
+      {% endfor %}
+    </svg>
+  {% endif %}
+{% endmacro %}
+
+{% macro avatar(user) %}<span class="avatar" aria-hidden="true">{{ user.initial }}</span>{% endmacro %}

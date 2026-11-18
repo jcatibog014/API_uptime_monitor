@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, csrf, empty, check_result, monitor_state, phases %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ monitor.name }} - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {% call page_head(monitor.name, back=url_for('monitors.index'), back_label='Monitors') %}
+    <a class="button button-quiet" href="{{ url_for('monitors.edit', monitor_id=monitor.id) }}">{{ icon('pencil') }} Change</a>
+    {% for template_name in monitor_actions|default([]) %}{% include template_name %}{% endfor %}
+    <form method="post" action="{{ url_for('monitors.check_now', monitor_id=monitor.id) }}">
+      {{ csrf() }}
+      <button class="button" type="submit">{{ icon('monitors') }} Check now</button>
+    </form>
+  {% endcall %}
+
+  {% set last = checks[0] if checks else None %}
+  <div class="monitor-head">
+    {% if monitor.paused or not last %}{{ monitor_state(monitor) }}{% else %}{{ check_result(last) }}{% endif %}
+    <span class="address">{{ monitor.method }} {{ monitor.url }}</span>
+  </div>
+
+  {% for template_name in monitor_panels|default([]) %}{% include template_name %}{% endfor %}
+
+  <div class="split">
+    <section class="card">
+      <div class="card-head"><h2>Latest Check</h2></div>
+      {% if last %}
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">Response</div>
+            <div class="readout">{{ last.total_ms|ms }}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Status</div>
+            <div class="readout">{{ last.status_code or '–' }}</div>
+          </div>
+        </div>
+        {% if last.total_ms %}
+          {{ phases(last) }}
+          <p class="phase-key top-gap">
+            <span class="ph-dns">DNS {{ last.dns_ms|ms }}</span>
+            <span class="ph-connect">Connect {{ last.connect_ms|ms }}</span>
+            {% if last.tls_ms %}<span class="ph-tls">TLS {{ last.tls_ms|ms }}</span>{% endif %}
+            <span class="ph-wait">Wait {{ last.ttfb_ms|ms }}</span>
+          </p>
+        {% endif %}
+        <p class="top-gap">{% if not last.ok %}<strong>{{ error_label(last.error_kind) }}:</strong> {% endif %}{{ last.message }}</p>
+        <p class="muted small">{{ last.started_at|nice_datetime }}{% if last.remote_ip %} · from {{ last.remote_ip }}{% endif %}{% if last.manual %} · Check now{% endif %}</p>
+      {% else %}
+        <p class="muted">Not checked yet. Press Check now to check it straight away.</p>
+      {% endif %}
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Settings</h2></div>
+      <dl class="facts">
+        <dt>How often</dt><dd>{{ interval_words }}</dd>
+        <dt>Wait</dt><dd>{{ monitor.timeout_s }} seconds</dd>
+        <dt>Good answers</dt><dd>{{ monitor.expected_statuses }}</dd>
+        {% for template_name in monitor_facts|default([]) %}{% include template_name %}{% endfor %}
+      </dl>
+      <form method="post" action="{{ url_for('monitors.delete', monitor_id=monitor.id) }}" class="top-gap"
+            data-confirm="Delete {{ monitor.name }} and all its checks? This can't be undone.">
+        {{ csrf() }}
+        <button class="button button-danger button-small" type="submit">{{ icon('trash', 16) }} Delete monitor</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="section top-gap">
+    <div class="card-head"><h2>Recent Checks</h2></div>
+    {% if checks %}
+      <div class="table-wrap">
+        <table class="fit-table check-table">
+          <thead><tr><th>When</th><th>Result</th><th class="num">Status</th><th class="num">Response</th><th>Where the Time Went</th><th>Note</th></tr></thead>
+          <tbody>
+            {% for check in checks %}
+              <tr>
+                <td>{{ check.started_at|nice_datetime }}</td>
+                <td>{{ check_result(check) }}</td>
+                <td class="num" data-label="Status">{{ check.status_code or '–' }}</td>
+                <td class="num" data-label="Response">{{ check.total_ms|ms }}</td>
+                <td>{{ phases(check) }}</td>
+                <td class="small">{% if not check.ok %}{{ error_label(check.error_kind) }}{% else %}{{ check.message }}{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      {{ empty('No Checks Yet', 'Checks show here as they happen.') }}
+    {% endif %}
+  </section>
+{% endblock %}

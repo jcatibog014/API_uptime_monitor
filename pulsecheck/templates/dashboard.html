@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, empty, check_result, monitor_state %}
+{% from "_icons.html" import icon %}
+{% block title %}Dashboard - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {% call page_head('Dashboard') %}
+    {% if rows %}<a class="button" href="{{ url_for('monitors.new') }}">{{ icon('plus') }} Add monitor</a>{% endif %}
+  {% endcall %}
+
+  {% for template_name in dashboard_banners|default([]) %}{% include template_name %}{% endfor %}
+
+  {% if not rows %}
+    {% call empty('No Monitors Yet', 'Add the address of an API or a website, and Pulse Check will check it every minute.') %}
+      <a class="button" href="{{ url_for('monitors.new') }}">{{ icon('plus') }} Add monitor</a>
+    {% endcall %}
+  {% else %}
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Monitors</div>
+        <div class="readout">{{ rows|length }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Up</div>
+        <div class="readout">{{ up }}</div>
+      </div>
+      <div class="stat{% if down %} stat-flat{% endif %}">
+        <div class="stat-label">Down</div>
+        <div class="readout">{{ down }}</div>
+      </div>
+      {% for template_name in dashboard_stats|default([]) %}{% include template_name %}{% endfor %}
+    </div>
+
+    <h2 class="visually-hidden">Every Monitor</h2>
+    <div class="tiles">
+      {% for monitor, last in rows %}
+        {% set word = pulse_state('paused') if monitor.paused else (check_word(last) if last else pulse_state(monitor_state_name(monitor))) %}
+        <a class="card tile tone-{{ word.tone }}" href="{{ url_for('monitors.page', monitor_id=monitor.id) }}">
+          <div class="tile-head">
+            <h2>{{ monitor.name }}</h2>
+            {% if monitor.paused or not last %}{{ monitor_state(monitor) }}{% else %}{{ check_result(last) }}{% endif %}
+          </div>
+          <span class="address">{{ monitor.url }}</span>
+          <div class="tile-foot">
+            <span class="readout">{% if last and last.ok %}{{ last.total_ms|ms }}{% else %}–{% endif %}</span>
+            <span class="muted">{% if last %}Checked {{ last.started_at|ago }}{% else %}Not checked yet{% endif %}</span>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}
