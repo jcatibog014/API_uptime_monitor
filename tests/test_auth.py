@@ -91,3 +91,14 @@ def test_set_password_command(app, client):
     assert result.exit_code == 0, result.output
     response = post(client, "/login", {"email": "maria@example.com", "password": "brand new pass"})
     assert response.status_code == 302
+
+
+def test_another_local_apps_cookie_doesnt_log_you_out(app, client):
+    """The owner's other Flask apps run on 127.0.0.1 too, and their login cookie is called
+    "session". Browsers keep cookies per host, not per port, so Pulse Check's must have its own name."""
+    make_owner(app)
+    post(client, "/login", {"email": "maria@example.com", "password": PASSWORD})
+    cookies = {cookie.key for cookie in client._cookies.values()}
+    assert "pulsecheck_session" in cookies and "session" not in cookies
+    client.set_cookie("session", "another-apps-login", domain="localhost")  # another app on another port
+    assert client.get("/monitors").status_code == 200

@@ -66,6 +66,11 @@ def create_app(test_config=None):
         # server that would let anyone with a login look around the server's own network.
         # Locally you may want to watch your own apps on 127.0.0.1, so you can allow it.
         ALLOW_PRIVATE_TARGETS=env_flag("ALLOW_PRIVATE_TARGETS", False),
+        # The login cookie has its own name. Browsers keep cookies per HOST, not per port,
+        # and every Flask app calls its cookie "session": the owner's other apps on
+        # 127.0.0.1 (ports 5000-5013) would overwrite Pulse Check's login, and the next
+        # click would land on the login page.
+        SESSION_COOKIE_NAME="pulsecheck_session",
         # Cookie safety: not readable by JavaScript (Flask's default), not sent
         # with forms from other sites, and only over HTTPS on the live site.
         SESSION_COOKIE_SAMESITE="Lax",
