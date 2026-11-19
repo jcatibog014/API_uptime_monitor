@@ -556,8 +556,15 @@ tbody tr:hover { background: var(--row-hover); }
 .demo-card h2 { margin: 0; }
 .demo-card p { margin: .25rem 0 1rem; color: var(--muted); }
 @media (max-width: 52rem) {
-  .welcome { grid-template-columns: 1fr; }
-  .welcome-panel { padding-bottom: 2rem; }
+  /* On a phone the panel is a slim header (logo, name, tagline), so the Log In card starts high:
+     the heartbeat and the note make way. */
+  .welcome { grid-template-columns: 1fr; align-content: start; }
+  .welcome-panel { gap: .35rem; padding: 1rem clamp(1rem, 4vw, 2rem) .9rem; }
+  .welcome-panel .logo { font-size: 1.35rem; gap: .6rem; }
+  .welcome-panel .logo-mark { width: 40px; height: 40px; }
+  .welcome-line { font-size: .95rem; }
+  .welcome-panel .trace, .welcome-note { display: none; }
+  .welcome-stage { padding-top: 1.5rem; align-content: start; }
 }
 
 /* ---------- One monitor's page ---------- */

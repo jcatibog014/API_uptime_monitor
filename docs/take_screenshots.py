@@ -105,6 +105,11 @@ def main():
         open_monitor(page, "Search API")
         shot(page, "monitor-dark.png", full=False)
 
+        visitor = browser.new_context(viewport=PHONE, is_mobile=True, has_touch=True, reduced_motion="reduce")
+        page = visitor.new_page()
+        page.goto(BASE + "/login")
+        shot(page, "phone-login.png", full=False)
+
         phone = browser.new_context(viewport=PHONE, is_mobile=True, has_touch=True, reduced_motion="reduce",
                                     storage_state=wide.storage_state())
         page = phone.new_page()
