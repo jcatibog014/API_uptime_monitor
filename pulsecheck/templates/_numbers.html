@@ -1,0 +1,139 @@
+{# One monitor's numbers: uptime and response times for a period, the chart, and the last 90 days.
+   Drawn by charts.py; every chart has a table under "View data table". #}
+{% from "_macros.html" import phases %}
+<section class="section top-gap" id="numbers">
+  <div class="card-head"><h2>Numbers</h2></div>
+  <nav aria-label="Period">
+    <ul class="tabs">
+      {% for key, (label, _length) in periods.items() %}
+        <li><a href="{{ url_for('monitors.page', monitor_id=monitor.id, period=key) }}#numbers"{% if key == period %} aria-current="page"{% endif %}>{{ label }}</a></li>
+      {% endfor %}
+    </ul>
+  </nav>
+
+  {% set approx = '' if numbers.exact else '≈ ' %}
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Uptime</div>
+      <div class="readout">{{ uptime(numbers.ok, numbers.counted) }}</div>
+      <div class="stat-note">{{ plural(numbers.counted, 'check') }}{% if numbers.missed %}, {{ numbers.missed|number }} not made{% endif %}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Typical</div>
+      <div class="readout">{% if numbers.ok %}{{ approx }}{{ numbers.percentile(50)|ms }}{% else %}–{% endif %}</div>
+      <div class="stat-note">Half were faster (p50)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Slowest 5%</div>
+      <div class="readout">{% if numbers.ok %}{{ approx }}{{ numbers.percentile(95)|ms }}{% else %}–{% endif %}</div>
+      <div class="stat-note">Slower than this (p95)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Slowest 1%</div>
+      <div class="readout">{% if numbers.ok %}{{ approx }}{{ numbers.percentile(99)|ms }}{% else %}–{% endif %}</div>
+      <div class="stat-note">Slower than this (p99)</div>
+    </div>
+    <div class="stat{% if incident_count %} stat-flat{% endif %}">
+      <div class="stat-label">Incidents</div>
+      <div class="readout">{{ incident_count }}</div>
+      <div class="stat-note">{% if down_seconds %}Down for {{ down_seconds|duration }}{% else %}No downtime{% endif %}</div>
+    </div>
+  </div>
+
+  <div class="grid grid-chart">
+    <section class="card chart-card">
+      <div class="card-head">
+        <h3>Response Time</h3>
+        <p class="chart-legend"><span class="key-line" aria-hidden="true"></span> Typical (p50) <span class="key-band" aria-hidden="true"></span> Slowest 5% (p95)</p>
+      </div>
+      {% if chart %}
+        <svg class="chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-label="Response time over {{ periods[period][0]|lower }}: the typical time and the slowest 5%. The table below has every value.">
+          {% for tick in chart.ticks %}
+            <line class="c-grid" x1="{{ chart.left }}" x2="{{ chart.right }}" y1="{{ tick.y }}" y2="{{ tick.y }}"></line>
+            <text class="c-axis" x="{{ chart.left - 8 }}" y="{{ tick.y + 5 }}" text-anchor="end">{{ tick.label }}</text>
+          {% endfor %}
+          {% for label in chart.labels %}
+            <text class="c-axis" x="{{ label.x }}" y="{{ chart.height - 6 }}" text-anchor="middle">{{ label.label }}</text>
+          {% endfor %}
+          {% for band in chart.bands %}<path class="c-band" d="{{ band }}"></path>{% endfor %}
+          {% for line in chart.lines %}<path class="c-line" d="{{ line }}"></path>{% endfor %}
+          {% for hit in chart.hits %}
+            <rect class="c-hit" x="{{ hit.x }}" y="{{ chart.top }}" width="{{ hit.width }}" height="{{ chart.bottom - chart.top }}"><title>{{ hit.point.start|nice_datetime }}: {% if hit.point.p50 is not none %}typical {{ hit.point.p50|ms }}, slowest 5% {{ hit.point.p95|ms }}{% else %}no good checks{% endif %}</title></rect>
+          {% endfor %}
+        </svg>
+      {% else %}
+        <p class="muted">No good checks in this period yet, so there are no response times to show.</p>
+      {% endif %}
+      <details class="fold">
+        <summary>View data table</summary>
+        <div class="table-wrap table-scroll">
+          <table>
+            <thead><tr><th>From</th><th class="num">Typical</th><th class="num">Slowest 5%</th><th class="num">Uptime</th><th class="num">Checks</th></tr></thead>
+            <tbody>
+              {% for point in points|reverse %}
+                <tr>
+                  <td>{{ point.start|nice_datetime }}</td>
+                  <td class="num">{{ point.p50|ms }}</td>
+                  <td class="num">{{ point.p95|ms }}</td>
+                  <td class="num">{{ uptime(point.stats.ok, point.stats.counted) }}</td>
+                  <td class="num">{{ point.stats.counted|number }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    {% if phase_average %}
+    <section class="card">
+      <div class="card-head"><h3>Where the Time Goes</h3></div>
+      <p class="muted small">The average good check of the last 24 hours, {{ phase_average.total_ms|ms }} in all.</p>
+      <div class="top-gap">{{ phases(phase_average) }}</div>
+      <ul class="phase-list">
+        <li><span class="ph-key ph-dns"></span> Finding the server (DNS) <strong>{{ phase_average.dns_ms|ms }}</strong></li>
+        <li><span class="ph-key ph-connect"></span> Connecting <strong>{{ phase_average.connect_ms|ms }}</strong></li>
+        {% if phase_average.tls_ms %}<li><span class="ph-key ph-tls"></span> Secure handshake (TLS) <strong>{{ phase_average.tls_ms|ms }}</strong></li>{% endif %}
+        <li><span class="ph-key ph-wait"></span> Waiting for the answer <strong>{{ phase_average.ttfb_ms|ms }}</strong></li>
+      </ul>
+    </section>
+    {% endif %}
+  </div>
+
+  <section class="card top-gap">
+    <div class="card-head">
+      <h3>Last 90 Days</h3>
+      <span class="readout readout-small">{{ uptime(strip_uptime.ok, strip_uptime.counted) }}</span>
+    </div>
+    <svg class="strip" viewBox="0 0 {{ strip.width }} {{ strip.height }}" preserveAspectRatio="none" role="img" aria-label="Uptime per day for the last 90 days. The table below lists every day that wasn't fully up.">
+      {% for bar in strip.bars %}
+        <rect class="s-{{ bar.day.level }}" x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.width }}" height="{{ bar.height }}" rx="1.5"><title>{{ bar.day.start|nice_date }}: {% if bar.day.level == 'none' %}not checked{% else %}{{ uptime(bar.day.stats.ok, bar.day.stats.counted) }} up{% endif %}</title></rect>
+      {% endfor %}
+    </svg>
+    <div class="strip-axis"><span>{{ strip.bars[0].day.start|nice_date }}</span><span>Today</span></div>
+    <ul class="strip-legend">
+      <li><span class="s-key s-key-up" aria-hidden="true"></span> Up all day (99.9% or more)</li>
+      <li><span class="s-key s-key-some" aria-hidden="true"></span> Some downtime (99% or more)</li>
+      <li><span class="s-key s-key-down" aria-hidden="true"></span> Down a lot (less than 99%)</li>
+      <li><span class="s-key s-key-none" aria-hidden="true"></span> Not checked</li>
+    </ul>
+    {% set rough = strip.bars|selectattr('day.level', 'in', ['some', 'down'])|list %}
+    <details class="fold">
+      <summary>View data table</summary>
+      {% if rough %}
+        <div class="table-wrap table-scroll">
+          <table>
+            <thead><tr><th>Day</th><th class="num">Uptime</th><th class="num">Checks</th></tr></thead>
+            <tbody>
+              {% for bar in rough|reverse %}
+                <tr><td>{{ bar.day.start|nice_date }}</td><td class="num">{{ uptime(bar.day.stats.ok, bar.day.stats.counted) }}</td><td class="num">{{ bar.day.stats.counted|number }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="muted">Every checked day was up 99.9% or more.</p>
+      {% endif %}
+    </details>
+  </section>
+</section>

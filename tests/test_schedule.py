@@ -135,7 +135,7 @@ def test_a_queued_check_for_a_paused_monitor_does_nothing(app, owner, site):
         s.commit()
         worker.run_until_idle(s, now_fn=lambda: NINE)
     assert rows(app, Check, Check.monitor_id == monitor_id) == []
-    assert [job.status for job in rows(app, Job)] == ["done"]
+    assert [job.status for job in rows(app, Job, Job.kind == "check")] == ["done"]
 
 
 # ---------- The queue ----------

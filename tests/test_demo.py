@@ -21,17 +21,17 @@ def test_the_same_check_always_gets_the_same_answer():
         assert practice.answer(url, NINE, 3) == practice.answer(url, NINE, 3), key
 
 
-def test_payments_has_a_short_outage_every_few_hours():
+def test_payments_has_a_short_outage_every_few_days():
     url = practice.address("payments-api")
-    minutes = [NINE + timedelta(minutes=n) for n in range(24 * 60)]
+    minutes = [NINE + timedelta(minutes=n) for n in range(9 * 24 * 60)]
     down = [moment for moment in minutes if not practice.answer(url, moment).ok]
-    assert 5 * 7 <= len(down) <= 7 * 7  # about one 7-minute outage in each 4 hours
+    assert len(down) % 7 == 0 and 2 * 7 <= len(down) <= 4 * 7  # one 7-minute outage in each 3-day block
     assert all(practice.answer(url, moment).error_kind == "timeout" for moment in down)
 
 
 def test_the_partner_api_is_flaky_and_search_is_often_slow():
     partner = [practice.answer(practice.address("partner-api"), NINE + timedelta(minutes=n)) for n in range(600)]
-    assert 0.1 < sum(not result.ok for result in partner) / 600 < 0.25
+    assert 0.03 < sum(not result.ok for result in partner) / 600 < 0.1
     assert {result.status_code for result in partner if not result.ok} == {502}
     search = [practice.answer(practice.address("search-api"), NINE + timedelta(minutes=n)) for n in range(600)]
     assert sum(result.total_ms > 1400 for result in search) > 40

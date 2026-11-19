@@ -248,3 +248,44 @@ class Timer(Base):
 
     name: Mapped[str] = mapped_column(String(40), primary_key=True)
     next_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+# Response-time buckets for the histograms in rollups (metrics.py): the upper edge of each, in ms.
+# Wider as they go up (a log scale): 10 ms matters at 50 ms, not at 5 seconds. One more bucket
+# holds everything slower than the last edge.
+BUCKET_EDGES = (10, 20, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 7500, 10000,
+                15000, 30000)
+BUCKETS = len(BUCKET_EDGES) + 1
+
+
+class Rollup(Base):
+    """One monitor's numbers for one hour (UTC) or one day (the workspace's own day), worked out
+    from its checks by rollups.py. Long periods (30, 90 days) add these up instead of reading
+    every check, and raw checks can then be deleted after 14 days.
+
+    A percentile can't be added up (the average of two p95s is not the p95 of both), but a
+    histogram can: b0..b20 count the good checks in each response-time bucket, and adding
+    two histograms gives the histogram of both. metrics.py reads percentiles off it."""
+    __tablename__ = "rollups"
+    __table_args__ = (UniqueConstraint("monitor_id", "period", "start"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    monitor_id: Mapped[int] = mapped_column(ForeignKey("monitors.id", ondelete="CASCADE"))
+    period: Mapped[str] = mapped_column(String(4))  # "hour" or "day"
+    start: Mapped[datetime] = mapped_column(DateTime)
+    checks: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    ok: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    slow: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    our_side: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    missed: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # skipped slots (gaps)
+    sum_ms: Mapped[float] = mapped_column(Float, default=0, server_default="0")  # of good checks
+    min_ms: Mapped[float | None] = mapped_column(Float)
+    max_ms: Mapped[float | None] = mapped_column(Float)
+    # b0 .. b20: good checks per response-time bucket (BUCKET_EDGES). Written in a loop: 21
+    # columns that are all the same. vars() here is the class being built.
+    for _n in range(BUCKETS):
+        vars()[f"b{_n}"] = mapped_column(Integer, default=0, server_default="0")
+    del _n
+
+    def histogram(self):
+        return [getattr(self, f"b{n}") or 0 for n in range(BUCKETS)]

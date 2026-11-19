@@ -82,6 +82,8 @@
     </section>
   </div>
 
+  {% if numbers is defined %}{% include "_numbers.html" %}{% endif %}
+
   {% if recent_incidents %}
   <section class="section top-gap">
     <div class="card-head"><h2>Recent Incidents</h2><a class="head-link" href="{{ url_for('incidents.index') }}">Every incident</a></div>

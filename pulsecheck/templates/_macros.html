@@ -54,15 +54,20 @@
   </div>
 {% endmacro %}
 
-{# How long each part of a check took, as one split bar (widths are SVG attributes: the CSP allows those). #}
+{# How long each part of a check took, as one thin split bar: DNS, connect, TLS, wait, in that
+   order and those colours (dataviz-checked). Parts share the width by their time, with a 2-unit
+   gap between them; a part too small to see still gets a sliver. Widths are SVG attributes. #}
 {% macro phases(check) %}
   {% if check and check.total_ms %}
-    {% set total = [check.total_ms, 1]|max %}
-    <svg class="phases" viewBox="0 0 100 10" preserveAspectRatio="none" role="img"
-         aria-label="DNS {{ check.dns_ms|ms }}, connect {{ check.connect_ms|ms }}, TLS {{ check.tls_ms|ms }}, wait {{ check.ttfb_ms|ms }}">
+    {% set parts = [] %}
+    {% for part, cls in [(check.dns_ms, 'ph-dns'), (check.connect_ms, 'ph-connect'), (check.tls_ms, 'ph-tls'), (check.ttfb_ms, 'ph-wait')] %}{% if part %}{% set _ = parts.append((part, cls)) %}{% endif %}{% endfor %}
+    {% set total = parts|sum(attribute=0) or 1 %}
+    {% set room = 300 - 2 * (parts|length - 1) %}
+    <svg class="phases" viewBox="0 0 300 8" preserveAspectRatio="none" role="img"
+         aria-label="DNS {{ check.dns_ms|ms }}, connect {{ check.connect_ms|ms }}{% if check.tls_ms %}, TLS {{ check.tls_ms|ms }}{% endif %}, wait {{ check.ttfb_ms|ms }}">
       {% set x = namespace(at=0) %}
-      {% for part, cls in [(check.dns_ms, 'ph-dns'), (check.connect_ms, 'ph-connect'), (check.tls_ms, 'ph-tls'), (check.ttfb_ms, 'ph-wait')] %}
-        {% if part %}{% set width = 100 * part / total %}<rect class="{{ cls }}" x="{{ '%.2f'|format(x.at) }}" y="0" width="{{ '%.2f'|format(width) }}" height="10"></rect>{% set x.at = x.at + width %}{% endif %}
+      {% for part, cls in parts %}
+        {% set width = [room * part / total, 1.5]|max %}<rect class="{{ cls }}" x="{{ '%.2f'|format(x.at) }}" y="0" width="{{ '%.2f'|format(width) }}" height="8"></rect>{% set x.at = x.at + width + 2 %}
       {% endfor %}
     </svg>
   {% endif %}

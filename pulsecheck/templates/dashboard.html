@@ -50,9 +50,16 @@
             {{ monitor_state(monitor) }}
           </div>
           <span class="address">{{ monitor_address(monitor) }}</span>
+          {% set spark = sparks.get(monitor.id) if sparks is defined else None %}
+          {% if spark %}
+            <svg class="spark{% if spark.failed %} is-failed{% endif %}" viewBox="-4 -4 {{ spark.width + 8 }} {{ spark.height + 8 }}" preserveAspectRatio="none" aria-hidden="true">
+              <polyline points="{{ spark.points }}"></polyline>
+              <circle cx="{{ spark.end_x }}" cy="{{ spark.end_y }}" r="3.5"></circle>
+            </svg>
+          {% endif %}
           <div class="tile-foot">
             <span class="readout">{% if last and last.ok and not monitor.paused %}{{ last.total_ms|ms }}{% else %}–{% endif %}</span>
-            <span class="muted">{% if last %}Checked {{ last.started_at|ago }}{% else %}Not checked yet{% endif %}</span>
+            <span class="muted">{% if uptime_24h is defined and uptime_24h.get(monitor.id) %}{{ uptime(*uptime_24h[monitor.id]) }} in 24 h · {% endif %}{% if last %}{{ last.started_at|ago }}{% else %}Not checked yet{% endif %}</span>
           </div>
         </a>
       {% endfor %}

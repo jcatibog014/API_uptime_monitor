@@ -68,8 +68,14 @@
   --pulse-flat-bg: #fde3e1;   --pulse-flat-ink: #9b1c1c;   --pulse-flat-lamp: #ef4444;
   --pulse-quiet-bg: #ebeeed;  --pulse-quiet-ink: #46504c;  --pulse-quiet-lamp: #9aa3a0;
   --pulse-rest-bg: #e3ecfb;   --pulse-rest-ink: #1e3a8a;   --pulse-rest-lamp: #60a5fa;
-  /* The parts of a check (DNS, connect, TLS, wait), as one split bar. Checked in stage 4. */
-  --ph-dns: #8b5cf6; --ph-connect: #0ea5e9; --ph-tls: #f59e0b; --ph-wait: #10b981;
+  /* Charts (charts.py), every colour checked with the dataviz validator against the card colour
+     (#ffffff here, #0e1c16 dark). Response times: one hue, blue (green means "up").
+     The parts of a check, in this order: DNS, connect, TLS, wait (categorical slots 1-4).
+     The uptime strip: status colours, always with a second signal (a shorter bar) and words. */
+  --chart-1: #2a78d6;
+  --ph-dns: #2a78d6; --ph-connect: #eb6834; --ph-tls: #1baf7a; --ph-wait: #eda100;
+  --status-good: #0ca30c; --status-warning: #fab219; --status-critical: #d03b3b; --status-none: #e2dcd9;
+  --chart-grid: #efe8e5;
 
   --radius: 8px;
   --radius-small: 4px;
@@ -93,6 +99,8 @@
     --pulse-flat-bg: #451a1a;   --pulse-flat-ink: #fecaca;   --pulse-flat-lamp: #f87171;
     --pulse-quiet-bg: #1e2a26;  --pulse-quiet-ink: #c4d3cc;  --pulse-quiet-lamp: #7f938b;
     --pulse-rest-bg: #172554;   --pulse-rest-ink: #bfdbfe;   --pulse-rest-lamp: #60a5fa;
+    --chart-1: #3987e5; --ph-dns: #3987e5; --ph-connect: #d95926; --ph-tls: #199e70; --ph-wait: #c98500;
+    --status-none: #29453a; --chart-grid: #1a3328;
     --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 6px 18px rgb(0 0 0 / .3);
   }
 }
@@ -108,6 +116,8 @@
   --pulse-flat-bg: #451a1a;   --pulse-flat-ink: #fecaca;   --pulse-flat-lamp: #f87171;
   --pulse-quiet-bg: #1e2a26;  --pulse-quiet-ink: #c4d3cc;  --pulse-quiet-lamp: #7f938b;
   --pulse-rest-bg: #172554;   --pulse-rest-ink: #bfdbfe;   --pulse-rest-lamp: #60a5fa;
+  --chart-1: #3987e5; --ph-dns: #3987e5; --ph-connect: #d95926; --ph-tls: #199e70; --ph-wait: #c98500;
+  --status-none: #29453a; --chart-grid: #1a3328;
   --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 6px 18px rgb(0 0 0 / .3);
 }
 
@@ -403,13 +413,54 @@ tbody tr:hover { background: var(--row-hover); }
 .tabs .count { font: 700 .75rem/1 var(--font-mono); opacity: .85; }
 
 /* How long each part of a check took: one bar, split into its parts. */
-.phases { display: block; width: 100%; min-width: 5rem; height: .7rem; border-radius: 99px; background: var(--surface-soft); overflow: hidden; }
+.phases { display: block; width: 100%; min-width: 5rem; height: 8px; border-radius: 99px; overflow: hidden; }
 .phase-key { display: inline-flex; flex-wrap: wrap; gap: .3rem .9rem; font-size: .85rem; color: var(--muted); }
 .phase-key span::before { content: ""; display: inline-block; width: .6rem; height: .6rem; border-radius: 2px; margin-right: .3rem; }
 .phases .ph-dns { fill: var(--ph-dns); } .phase-key .ph-dns::before { background: var(--ph-dns); }
 .phases .ph-connect { fill: var(--ph-connect); } .phase-key .ph-connect::before { background: var(--ph-connect); }
 .phases .ph-tls { fill: var(--ph-tls); } .phase-key .ph-tls::before { background: var(--ph-tls); }
 .phases .ph-wait { fill: var(--ph-wait); } .phase-key .ph-wait::before { background: var(--ph-wait); }
+
+/* ---------- Charts (charts.py) ---------- */
+
+.grid-chart { grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr); align-items: start; }
+@media (max-width: 64rem) { .grid-chart { grid-template-columns: 1fr; } }
+.chart-card .card-head { margin-bottom: .4rem; }
+.chart { display: block; width: 100%; height: auto; overflow: visible; }
+.c-grid { stroke: var(--chart-grid); stroke-width: 1; }
+.c-axis { fill: var(--muted); font: 500 15px var(--font-mono); }  /* viewBox units: about 11px on screen */
+.c-line { fill: none; stroke: var(--chart-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.c-band { fill: var(--chart-1); opacity: .12; }
+.c-hit { fill: transparent; }
+.c-hit:hover { fill: var(--chart-1); fill-opacity: .07; }
+.chart-legend { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem .5rem; color: var(--muted); font-size: .85rem; }
+.key-line, .key-band { display: inline-block; width: 1.1rem; vertical-align: middle; }
+.key-line { height: 2px; background: var(--chart-1); border-radius: 2px; }
+.key-band { height: .7rem; background: color-mix(in srgb, var(--chart-1) 14%, transparent); border-top: 2px solid color-mix(in srgb, var(--chart-1) 40%, transparent); margin-left: .5rem; }
+.table-scroll { max-height: 22rem; overflow-y: auto; }
+.readout-small { font-size: 1.3rem; }
+.phase-list { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: .45rem; }
+.phase-list li { display: flex; align-items: center; gap: .55rem; font-size: .92rem; }
+.phase-list strong { margin-left: auto; font: 700 .9rem var(--font-mono); }
+.ph-key { width: .8rem; height: .8rem; border-radius: 3px; flex: 0 0 auto; background: var(--ph-dns); }
+.ph-key.ph-connect { background: var(--ph-connect); } .ph-key.ph-tls { background: var(--ph-tls); } .ph-key.ph-wait { background: var(--ph-wait); }
+
+/* The uptime strip: one bar per day. A shorter bar is a worse day (colour never works alone). */
+.strip { display: block; width: 100%; height: 2.4rem; }
+.s-up { fill: var(--status-good); } .s-some { fill: var(--status-warning); } .s-down { fill: var(--status-critical); } .s-none { fill: var(--status-none); }
+.strip rect:hover { opacity: .75; }
+.strip-axis { display: flex; justify-content: space-between; color: var(--muted); font: 500 .75rem var(--font-mono); margin-top: .35rem; }
+.strip-legend { list-style: none; margin: .8rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; font-size: .85rem; color: var(--muted); }
+.strip-legend li { display: inline-flex; align-items: flex-end; gap: .4rem; }
+.s-key { display: inline-block; width: .55rem; border-radius: 2px; }
+.s-key-up { height: 1rem; background: var(--status-good); } .s-key-some { height: .62rem; background: var(--status-warning); }
+.s-key-down { height: .34rem; background: var(--status-critical); } .s-key-none { height: 3px; background: var(--status-none); }
+
+/* The tile's sparkline: the last 30 checks, like a strip of heart trace. */
+.spark { display: block; width: 100%; height: 2.2rem; overflow: visible; }
+.spark polyline { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; opacity: .7; }
+.spark circle { fill: var(--chart-1); stroke: var(--surface); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.spark.is-failed circle { fill: var(--status-critical); }
 
 /* ---------- Toasts ---------- */
 
