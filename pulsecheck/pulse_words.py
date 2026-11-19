@@ -43,6 +43,14 @@ CHECK = {
                                  "probably our connection, not this service. Not counted.", "quiet"),
 }
 
+# A member of the crew (worker.py), on the Crew page.
+WORKER = {
+    "on": Word("On Duty", "Working: it wrote its heartbeat in the last 2 minutes.", "steady"),
+    "quiet": Word("Gone Quiet", "No heartbeat for over 2 minutes. It may be stuck on a slow check, or stopped.",
+                  "weak"),
+    "off": Word("Off Duty", "Stopped on purpose.", "quiet"),
+}
+
 # Why a check failed, in plain words (probe.py sets error_kind).
 ERRORS = {
     "dns": "Name not found",
@@ -80,4 +88,4 @@ def error_label(kind):
 
 def init_app(app):
     app.jinja_env.globals.update(pulse_state=state, check_word=check_word, error_label=error_label,
-                                 monitor_state_name=monitor_state_name)
+                                 monitor_state_name=monitor_state_name, worker_word=WORKER.get)

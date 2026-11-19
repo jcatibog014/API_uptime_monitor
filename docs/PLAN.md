@@ -126,7 +126,7 @@ Every row has `workspace_id`, and every foreign key has a leading index.
 ## Progress
 
 - [x] Stage 1: setup and probing
-- [ ] Stage 2: scheduled jobs
+- [x] Stage 2: scheduled jobs
 - [ ] Stage 3: failure handling + demo
 - [ ] Stage 4: metrics
 - [ ] Stage 5: alerts
@@ -138,3 +138,4 @@ Every row has `workspace_id`, and every foreign key has a leading index.
 ## Where the Build Differs
 
 - Stage 1: the `checks` table came in stage 1 (not stage 2), so Check now can save its result. It already has the `slow` and `our_side` columns that stages 3 and 6 use.
+- Stage 2: the timer runs every 10 minutes (Right On Cue's ran every 30, to save Neon's awake hours; Supabase has no such limit). The queue's lease is 120 s, not 60, so a sleepy host's 90-second check never looks like a dead worker.

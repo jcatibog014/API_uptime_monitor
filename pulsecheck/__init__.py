@@ -72,9 +72,18 @@ def create_app(test_config=None):
         SESSION_COOKIE_SECURE=on_render,
         PERMANENT_SESSION_LIFETIME=timedelta(days=30),
         MAX_CONTENT_LENGTH=1 * 1000 * 1000,
+        # The secret the GitHub Actions timer sends to POST /tasks/tick (tick.py).
+        TICK_KEY=os.environ.get("TICK_KEY"),
+        # Worker threads inside the web app (worker.py). Locally you can turn them
+        # off (RUN_WORKER=0) and run `flask --app pulsecheck worker` in its own window.
+        RUN_WORKER=env_flag("RUN_WORKER", True),
+        CREW_SIZE=int(os.environ.get("CREW_SIZE", "4")),
     )
     if test_config:
         app.config.update(test_config)
+    if app.testing:
+        # Tests run the crew by hand (worker.simulate), never in threads of their own.
+        app.config["RUN_WORKER"] = bool(test_config and test_config.get("RUN_WORKER"))
     if on_render:
         # Render's proxy talks HTTPS to the visitor and HTTP to us. This makes Flask
         # believe the X-Forwarded-* headers: links start with https://, and the rate
@@ -88,8 +97,8 @@ def create_app(test_config=None):
         # Without it we'd use a SQLite file, and Render forgets files on every restart.
         raise RuntimeError("Set the DATABASE_URL environment variable on Render (Supabase's connection string).")
 
-    from . import auth, db, formatting, pulse_words
-    from .views import dashboard, monitors, settings
+    from . import auth, db, formatting, pulse_words, scheduler, tick, worker  # noqa: F401 (scheduler registers its jobs)
+    from .views import crew, dashboard, monitors, settings
 
     db.init_app(app)
     auth.init_app(app)
@@ -97,8 +106,11 @@ def create_app(test_config=None):
     pulse_words.init_app(app)
     monitors.init_app(app)
     settings.init_app(app)
+    crew.init_app(app)
+    tick.init_app(app)
+    worker.init_app(app)
     # auth comes first: its before_request (load_user) must run before the others'.
-    for blueprint in (auth.bp, dashboard.bp, monitors.bp, settings.bp):
+    for blueprint in (auth.bp, dashboard.bp, monitors.bp, crew.bp, settings.bp, tick.bp):
         app.register_blueprint(blueprint)
 
     app.jinja_env.globals.update(APP_NAME=APP_NAME, TAGLINE=TAGLINE,

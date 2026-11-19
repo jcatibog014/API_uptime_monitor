@@ -1,7 +1,7 @@
 """Monitor pages: the list, add, change, delete, one monitor's page, and Check now."""
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 
-from .. import checking, db, limits, monitors, probe
+from .. import checking, db, limits, monitors, probe, scheduler, worker
 from ..auth import login_required
 from ..dates import utcnow
 
@@ -13,6 +13,13 @@ CHECK_NOW_PER_MINUTE = 6
 page_extras = []
 # Called after a monitor is added, changed, paused or resumed: function(s, monitor, moment).
 on_change = []
+
+
+def changed(s, monitor, moment):
+    for hook in on_change:
+        hook(s, monitor, moment)
+    s.commit()
+    worker.nudge()  # its next check may be sooner than the crew's next wake-up
 
 
 def form_page(template, values, errors, monitor=None):
@@ -43,9 +50,8 @@ def new():
     if errors:
         return form_page("monitor_form.html", values, errors)
     monitor = monitors.save(s, g.workspace, values)
-    for hook in on_change:
-        hook(s, monitor, utcnow())
-    s.commit()
+    scheduler.schedule(monitor, utcnow(), check_now=True)
+    changed(s, monitor, utcnow())
     flash(f"{monitor.name} is added. Its first check is on its way.")
     return redirect(url_for("monitors.page", monitor_id=monitor.id))
 
@@ -72,10 +78,11 @@ def edit(monitor_id):
     values, errors = monitors.read_form(request.form, current_app.config["ALLOW_PRIVATE_TARGETS"])
     if errors:
         return form_page("monitor_form.html", values, errors, monitor)
+    old_interval = monitor.interval_s
     monitors.save(s, g.workspace, values, monitor)
-    for hook in on_change:
-        hook(s, monitor, utcnow())
-    s.commit()
+    if monitor.interval_s != old_interval:
+        scheduler.schedule(monitor, utcnow())  # onto the new timetable
+    changed(s, monitor, utcnow())
     flash("The monitor is saved.")
     return redirect(url_for("monitors.page", monitor_id=monitor.id))
 
@@ -90,6 +97,20 @@ def delete(monitor_id):
     s.commit()
     flash(f"{name} is deleted, with all its checks.")
     return redirect(url_for("monitors.index"))
+
+
+@bp.post("/<int:monitor_id>/pause")
+@login_required
+def pause(monitor_id):
+    """Pause checks (nothing is counted while paused), or resume them with a check straight away."""
+    s = db.session()
+    monitor = monitors.get(s, monitor_id)
+    monitor.paused = not monitor.paused
+    scheduler.schedule(monitor, utcnow(), check_now=True)
+    changed(s, monitor, utcnow())
+    flash(f"{monitor.name} is paused. It isn't checked until you resume it." if monitor.paused
+          else f"{monitor.name} is checked again, starting now.")
+    return redirect(url_for("monitors.page", monitor_id=monitor.id))
 
 
 @bp.post("/<int:monitor_id>/check")
