@@ -543,7 +543,7 @@ tbody tr:hover { background: var(--row-hover); }
 /* ---------- The login: the monitor on the left, the card on ECG paper ---------- */
 
 .welcome { display: grid; grid-template-columns: minmax(18rem, 1fr) 2fr; min-height: 100vh; }
-.welcome-panel { display: flex; flex-direction: column; justify-content: center; gap: 1.1rem; padding: clamp(2rem, 4vw, 4rem); box-shadow: inset -1px 0 0 var(--bezel-edge), inset -10px 0 24px rgb(0 0 0 / .45); }
+.welcome-panel { display: flex; flex-direction: column; justify-content: flex-start; gap: 1.1rem; padding: clamp(2rem, 4vw, 3.5rem) clamp(2rem, 4vw, 4rem); box-shadow: inset -1px 0 0 var(--bezel-edge), inset -10px 0 24px rgb(0 0 0 / .45); }
 .welcome-panel .logo { font-size: clamp(1.8rem, 1.3rem + 1vw, 2.4rem); gap: .9rem; }
 .welcome-line { font: 700 1.2rem/1.35 var(--font-display); color: var(--trace); }
 .welcome-note { color: var(--screen-muted); max-width: 26rem; }
