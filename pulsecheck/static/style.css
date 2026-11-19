@@ -1,9 +1,9 @@
 /* Pulse Check: a bedside heart monitor.
 
    The monitor is drawn here and in small inline SVGs, with no picture files:
-   - ECG PAPER (body): the faint grid of small and big squares that heart
-     tracings are printed on. Pink-red on cream in the light theme ("clinic
-     chart"), green on black in the dark theme ("monitor on");
+   - ECG PAPER (.ecg-paper): the faint grid of small and big squares that heart
+     tracings are printed on. Only on the monitor itself now: the page under
+     the data is a solid colour, so tables and numbers read clearly;
    - the MONITOR SCREEN (.screen): black-green glass with its own green grid,
      on the login panel, the menu's top and big readouts;
    - the BEZEL (.bezel): the monitor's dark plastic case, the menu;
@@ -45,7 +45,8 @@
   --danger-soft: #fde3e1;
   --ok: #047857;
   --ok-soft: #dcf5e9;
-  --row-hover: #fbf3f0;
+  --row-hover: #f6ece8;
+  --row-zebra: #fbf7f5;
   --glow: none;               /* readouts glow only on the dark monitor */
 
   /* The monitor itself: always dark, in both themes (it is a screen). */
@@ -89,11 +90,11 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #07110d; --grid-minor: rgb(52 211 153 / .035); --grid-major: rgb(52 211 153 / .07);
+    --bg: #0a0f0d; --grid-minor: rgb(52 211 153 / .035); --grid-major: rgb(52 211 153 / .07);
     --surface: #0e1c16; --surface-soft: #13261e; --ink: #e2f3ea; --muted: #94b3a5; --rule: #1f3a2e;
     --control-border: #4e7565; --accent: #34d399; --accent-hover: #6ee7b7; --accent-soft: #0f3a29;
     --on-accent: #052e1f; --link: #6ee7b7; --focus: #6ee7b7; --danger: #f87171; --danger-soft: #451a1a;
-    --ok: #34d399; --ok-soft: #0f3a29; --row-hover: #12241c; --glow: 0 0 10px rgb(52 211 153 / .45);
+    --ok: #34d399; --ok-soft: #0f3a29; --row-hover: #15291f; --row-zebra: #102019; --glow: 0 0 10px rgb(52 211 153 / .45);
     --pulse-steady-bg: #0f3a29; --pulse-steady-ink: #a7f3d0; --pulse-steady-lamp: #34d399;
     --pulse-weak-bg: #3d2e0c;   --pulse-weak-ink: #fcd98a;   --pulse-weak-lamp: #fbbf24;
     --pulse-flat-bg: #451a1a;   --pulse-flat-ink: #fecaca;   --pulse-flat-lamp: #f87171;
@@ -106,11 +107,11 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #07110d; --grid-minor: rgb(52 211 153 / .035); --grid-major: rgb(52 211 153 / .07);
+  --bg: #0a0f0d; --grid-minor: rgb(52 211 153 / .035); --grid-major: rgb(52 211 153 / .07);
   --surface: #0e1c16; --surface-soft: #13261e; --ink: #e2f3ea; --muted: #94b3a5; --rule: #1f3a2e;
   --control-border: #4e7565; --accent: #34d399; --accent-hover: #6ee7b7; --accent-soft: #0f3a29;
   --on-accent: #052e1f; --link: #6ee7b7; --focus: #6ee7b7; --danger: #f87171; --danger-soft: #451a1a;
-  --ok: #34d399; --ok-soft: #0f3a29; --row-hover: #12241c; --glow: 0 0 10px rgb(52 211 153 / .45);
+  --ok: #34d399; --ok-soft: #0f3a29; --row-hover: #15291f; --row-zebra: #102019; --glow: 0 0 10px rgb(52 211 153 / .45);
   --pulse-steady-bg: #0f3a29; --pulse-steady-ink: #a7f3d0; --pulse-steady-lamp: #34d399;
   --pulse-weak-bg: #3d2e0c;   --pulse-weak-ink: #fcd98a;   --pulse-weak-lamp: #fbbf24;
   --pulse-flat-bg: #451a1a;   --pulse-flat-ink: #fecaca;   --pulse-flat-lamp: #f87171;
@@ -128,9 +129,9 @@ html { font-size: 100%; -webkit-text-size-adjust: 100%; }
 @media (min-width: 1600px) { html { font-size: 106.25%; } }
 @media (min-width: 1920px) { html { font-size: 112.5%; } }
 @media (min-width: 2300px) { html { font-size: 125%; } }
-body { margin: 0; min-height: 100vh; color: var(--ink); font: 400 1rem/1.55 var(--font-body); }
+body { margin: 0; min-height: 100vh; color: var(--ink); background: var(--bg); font: 400 1rem/1.55 var(--font-body); }
 /* ECG paper: small squares every 8px, a stronger line every 40px (five small ones). */
-body, .ecg-paper {
+.ecg-paper {
   background-color: var(--bg);
   background-image:
     linear-gradient(var(--grid-major) 1px, transparent 1px),
@@ -188,7 +189,7 @@ html:not(.js) .js-only { display: none !important; }
 @keyframes flat-blink { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) {
   .trace .trace-live { animation: none; stroke-dasharray: none; }
-  .pulse-steady::before { animation: none !important; }
+  .pulse-steady::before, .pulse-wait::before { animation: none !important; }
 }
 
 /* A readout: a big number the way a bedside monitor shows the heart rate. */
@@ -209,7 +210,7 @@ html:not(.js) .js-only { display: none !important; }
 .sidebar-screen .trace { margin-top: .5rem; height: 1.6rem; }
 .logo { display: inline-flex; align-items: center; gap: .6rem; font: 700 1.2rem/1.1 var(--font-display); color: inherit; text-decoration: none; white-space: nowrap; }
 .logo-mark { flex: 0 0 auto; }
-.demo-tag { font: 700 .7rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; background: #fbbf24; color: #2a1a00; padding: .28rem .45rem; border-radius: 4px; }
+.demo-tag { font: 700 .6rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--bezel-muted); border: 1px solid rgb(163 184 174 / .45); padding: .2rem .35rem; border-radius: 4px; }
 .side-links { list-style: none; margin: 1.1rem 0 0; padding: 0; display: grid; gap: .15rem; }
 .side-links a { display: flex; align-items: center; gap: .7rem; min-height: 2.5rem; padding: .35rem .75rem; border-radius: var(--radius); font-weight: 600; color: var(--bezel-ink); }
 .side-links a svg { opacity: .85; }
@@ -250,16 +251,12 @@ html:not(.js) .js-only { display: none !important; }
   .user-menu-items { bottom: auto; top: calc(100% + .4rem); }
 }
 
-/* ---------- Page titles: bare, with a heartbeat line under them ---------- */
+/* ---------- Page titles: bare, with a thin line under them ---------- */
 
 .page-head { display: flex; align-items: flex-end; gap: .75rem 1rem; padding: 1.6rem 0 .5rem; }
 .page-head h1 { flex: 1 1 auto; min-width: 0; }
 .head-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-left: auto; align-items: center; justify-content: flex-end; }
-.title-trace { display: flex; align-items: center; margin-bottom: 1.4rem; color: var(--accent); opacity: .75; }
-.title-trace::before { content: ""; flex: 0 0 1.5rem; height: 2px; background: currentColor; border-radius: 2px; }
-.title-trace::after { content: ""; flex: 1 1 auto; height: 2px; background: linear-gradient(90deg, currentColor, transparent 85%); border-radius: 2px; }
-.title-trace svg { flex: 0 0 auto; margin: 0 -1px; }
-.title-trace path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.title-trace { height: 1px; margin: .35rem 0 1.4rem; background: linear-gradient(90deg, var(--accent), var(--rule) 30%, var(--rule)); }
 .back-link { display: inline-flex; align-items: center; gap: .3rem; font-size: .9rem; margin-top: 1.2rem; }
 .back-link + .page-head { padding-top: .4rem; }
 
@@ -282,7 +279,7 @@ html:not(.js) .js-only { display: none !important; }
 /* Stat boxes: a readout and what it counts. */
 .stats { display: grid; gap: .75rem 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); margin-bottom: 1.4rem; }
 .stat { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: .9rem 1.1rem; box-shadow: var(--shadow); }
-.stat-label { font: 700 .72rem/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.stat-label { font: 700 .8rem/1.3 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); opacity: .85; }
 .stat .readout { margin-top: .3rem; }
 .stat-note { font-size: .85rem; color: var(--muted); margin-top: .15rem; }
 .stat-flat .readout { color: var(--danger); text-shadow: none; }
@@ -322,6 +319,10 @@ html:not(.js) .js-only { display: none !important; }
 .pulse-weak { background: var(--pulse-weak-bg); color: var(--pulse-weak-ink); } .pulse-weak::before { background: var(--pulse-weak-lamp); }
 .pulse-flat { background: var(--pulse-flat-bg); color: var(--pulse-flat-ink); } .pulse-flat::before { background: var(--pulse-flat-lamp); box-shadow: 0 0 6px 1px var(--pulse-flat-lamp); }
 .pulse-rest { background: var(--pulse-rest-bg); color: var(--pulse-rest-ink); } .pulse-rest::before { background: var(--pulse-rest-lamp); }
+/* Waiting for its first check: the lamp breathes, so it reads as "on its way", not stuck. */
+.pulse-wait { background: var(--pulse-quiet-bg); color: var(--pulse-quiet-ink); }
+.pulse-wait::before { animation: waiting 1.6s ease-in-out infinite; }
+@keyframes waiting { 50% { opacity: .25; } }
 @keyframes beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.45); } 24% { transform: scale(1); } 36% { transform: scale(1.25); } 48% { transform: scale(1); } }
 .pulse-legend { display: grid; gap: .55rem; grid-template-columns: max-content 1fr; align-items: center; margin: .8rem 0 0; }
 .pulse-legend dt { margin: 0; } .pulse-legend dd { margin: 0; color: var(--muted); font-size: .9rem; }
@@ -388,7 +389,9 @@ details.fold[open] > summary { margin-bottom: .8rem; }
 
 .table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
 table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+th, td { text-align: left; padding: .8rem .9rem; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+/* Zebra rows: every other row a shade apart, so the eye can follow a row across. */
+tbody tr:nth-child(even) { background: var(--row-zebra); }
 th { font: 700 .72rem/1.3 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); background: var(--surface-soft); white-space: nowrap; }
 tr:last-child td { border-bottom: 0; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -526,8 +529,44 @@ tbody tr:hover { background: var(--row-hover); }
 /* The error budget: a thin meter. The fill carries severity (good, then warning past half,
    critical when spent), always with its words beside it; the track is a lighter step. */
 .meter { display: block; width: 100%; max-width: 12rem; height: 8px; border-radius: 99px; overflow: hidden; margin-bottom: .25rem; }
-.meter-track { fill: var(--status-none); }
+.meter-track { fill: var(--status-none); }  /* the fill is what is LEFT: full and green when untouched */
 .meter-good { fill: var(--status-good); } .meter-warning { fill: var(--status-warning); } .meter-critical { fill: var(--status-critical); }
+
+/* ---------- Switches, address fields, dragging rows, grouped incidents ---------- */
+
+/* An on/off switch: a real button (it submits its form), drawn as a switch. */
+.switch { position: relative; flex: 0 0 auto; width: 3rem; height: 1.7rem; border-radius: 99px; border: 1px solid var(--control-border); background: var(--surface-soft); cursor: pointer; padding: 0; }
+.switch::after { content: ""; position: absolute; top: 50%; left: .2rem; width: 1.2rem; height: 1.2rem; margin-top: -.6rem; border-radius: 50%; background: var(--muted); transition: transform .15s ease, background .15s ease; }
+.switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+.switch[aria-checked="true"]::after { transform: translateX(1.25rem); background: var(--on-accent); }
+.switch:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* An address with a fixed start and the part you choose. */
+.prefix-field { display: flex; max-width: 40rem; }
+.prefix-field span { display: flex; align-items: center; padding: 0 .7rem; border: 1px solid var(--control-border); border-right: 0; border-radius: var(--radius) 0 0 var(--radius); background: var(--surface-soft); color: var(--muted); font: 500 .85rem var(--font-mono); white-space: nowrap; flex: 0 0 auto; }
+@media (max-width: 30rem) { .prefix-field { flex-direction: column; } .prefix-field span { border-right: 1px solid var(--control-border); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; padding: .45rem .7rem; white-space: normal; overflow-wrap: anywhere; } .prefix-field input { border-radius: 0 0 var(--radius) var(--radius); } }
+.prefix-field input { border-radius: 0 var(--radius) var(--radius) 0; font-family: var(--font-mono); font-size: .92rem; min-width: 0; }
+
+.drag-handle { width: 2rem; height: 2rem; display: inline-grid; place-items: center; border: 0; background: none; color: var(--muted); cursor: grab; border-radius: var(--radius-small); font-size: 1.1rem; letter-spacing: -.15em; }
+.drag-handle:hover, .drag-handle:focus-visible { background: var(--surface-soft); color: var(--ink); }
+tr.is-dragging { opacity: .45; }
+.js .order-cell { display: none; }
+html:not(.js) .handle-cell { display: none; }
+
+.incident-group { border-top: 1px solid var(--rule); }
+.incident-group:first-child { border-top: 0; }
+.incident-group > summary { list-style: none; display: flex; align-items: center; flex-wrap: wrap; gap: .4rem 1rem; padding: .85rem 1rem; cursor: pointer; }
+.incident-group > summary::-webkit-details-marker { display: none; }
+.incident-group > summary::before { content: "\25B8"; color: var(--muted); transition: transform .15s ease; }
+.incident-group[open] > summary::before { transform: rotate(90deg); }
+.incident-group > summary:hover { background: var(--row-hover); }
+.incident-group .group-name { font-weight: 700; flex: 1 1 12rem; }
+.incident-group .group-facts { color: var(--muted); font-size: .9rem; }
+.incident-group .table-wrap { border: 0; border-top: 1px solid var(--rule); border-radius: 0; box-shadow: none; }
+.groups { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.row-actions { width: 1%; white-space: nowrap; text-align: right; }
+.row-actions form { display: inline; margin: 0; }
+.icon-button-small { width: 2rem; height: 2rem; }
 
 /* ---------- Toasts ---------- */
 

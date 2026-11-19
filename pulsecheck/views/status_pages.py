@@ -90,8 +90,11 @@ def edit(page_id):
                 flash("The status page is saved.")
                 return redirect(url_for("status_pages.edit", page_id=page.id))
     shown = {entry.monitor_id: entry for entry in page.entries}
+    # The rows in the page's order: its monitors first, as placed, then the others by name.
+    sorted_monitors = sorted(all_monitors, key=lambda monitor: (
+        (0, shown[monitor.id].position) if monitor.id in shown else (1, 0), monitor.name.lower()))
     return render_template("status_page_form.html", page=page, monitors=all_monitors, shown=shown, errors=errors,
-                           form=form), 400 if errors else 200
+                           form=form, sorted_monitors=sorted_monitors), 400 if errors else 200
 
 
 @bp.post("/status-pages/<int:page_id>/delete")

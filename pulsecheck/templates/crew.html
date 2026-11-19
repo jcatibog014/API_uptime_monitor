@@ -12,6 +12,11 @@
     {% endif %}
   {% endcall %}
 
+  {% if not on_duty %}
+    <div class="banner" role="alert">
+      <div><strong>No worker is on duty</strong>Nothing is being checked right now. {% if can_start and not g.user.is_demo %}Press Start the crew, or restart the app.{% else %}The app may be restarting: this clears in a minute. If it doesn't, restart the app.{% endif %}</div>
+    </div>
+  {% endif %}
   {% for template_name in crew_banners|default([]) %}{% include template_name %}{% endfor %}
 
   <div class="stats">
@@ -56,8 +61,9 @@
         </table>
       </div>
     {% else %}
-      {{ empty('Nobody on Duty', 'No worker has written a heartbeat in the last hour, so no checks are being made.') }}
+      {{ empty('Nobody on Duty', 'No worker has written a heartbeat in the last few minutes, so no checks are being made.') }}
     {% endif %}
+    {% if stopped %}<p class="muted small top-gap">{{ plural(stopped, 'worker') }} from earlier in the last hour stopped (the app restarted). Not shown.</p>{% endif %}
   </section>
 
   {% if canary_on %}

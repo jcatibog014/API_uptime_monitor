@@ -10,21 +10,29 @@
   <form method="post" class="card form-card stack" novalidate>
     {{ csrf() }}
     {{ field('name', 'Name', posted('name', page.name), errors.name, hint='The page title', attrs='required maxlength="80"') }}
-    {{ field('slug', 'Address', posted('slug', page.slug), errors.slug, hint=config.BASE_URL ~ '/status/', attrs='required maxlength="60" autocomplete="off" spellcheck="false"') }}
+    <label class="field{% if errors.slug %} has-error{% endif %}">
+      <span class="field-label">Address <span class="hint">Small letters, numbers and dashes</span></span>
+      <span class="prefix-field">
+        <span title="{{ config.BASE_URL }}/status/">{{ config.BASE_URL.split('://')[-1] }}/status/</span>
+        <input type="text" name="slug" value="{{ posted('slug', page.slug) }}" required maxlength="60" autocomplete="off" spellcheck="false"{% if errors.slug %} aria-invalid="true"{% endif %}>
+      </span>
+      {% if errors.slug %}<p class="field-error">{{ errors.slug }}</p>{% endif %}
+    </label>
     {{ field('intro', 'A line under the title', posted('intro', page.intro), errors.intro, hint='Optional', attrs='maxlength="300"') }}
     <fieldset class="stack-small{% if errors.monitors %} has-error{% endif %}">
       <legend class="field-label">Monitors on the page</legend>
-      <p class="field-note">Give one a friendlier name if you like (people see "Checkout", not "Payments API"). Lower numbers come first.</p>
+      <p class="field-note">Give one a friendlier name if you like (people see "Checkout", not "Payments API"). Drag the rows (or use the arrow keys on a handle) to set the order.</p>
       <div class="table-wrap">
         <table class="fit-table">
-          <thead><tr><th>Show</th><th>Name on the Page</th><th class="num">Order</th></tr></thead>
-          <tbody>
-            {% for monitor in monitors %}
+          <thead><tr><th class="handle-cell"><span class="visually-hidden">Order</span></th><th>Show</th><th>Name on the Page</th><th class="num order-cell">Order</th></tr></thead>
+          <tbody data-sortable>
+            {% for monitor in sorted_monitors %}
               {% set entry = shown.get(monitor.id) %}
-              <tr>
+              <tr draggable="true">
+                <td class="handle-cell"><button class="drag-handle" type="button" data-drag-handle aria-label="Move {{ monitor.name }} (arrow keys)" title="Drag to move">&#8942;&#8942;</button></td>
                 <td><label class="check"><input type="checkbox" name="show_{{ monitor.id }}" value="1"{% if entry or form.get('show_' ~ monitor.id) %} checked{% endif %}> {{ monitor.name }}</label></td>
                 <td><input type="text" name="label_{{ monitor.id }}" value="{{ form.get('label_' ~ monitor.id, entry.label if entry else '') }}" maxlength="80" placeholder="{{ monitor.name }}" aria-label="Name on the page for {{ monitor.name }}"></td>
-                <td class="num"><input class="number-box" type="number" name="position_{{ monitor.id }}" value="{{ form.get('position_' ~ monitor.id, entry.position if entry else loop.index0) }}" min="0" max="99" aria-label="Order of {{ monitor.name }}"></td>
+                <td class="num order-cell"><input class="number-box" type="number" name="position_{{ monitor.id }}" value="{{ form.get('position_' ~ monitor.id, loop.index0) }}" min="0" max="99" aria-label="Order of {{ monitor.name }}" data-position></td>
               </tr>
             {% endfor %}
           </tbody>

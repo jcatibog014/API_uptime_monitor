@@ -23,7 +23,7 @@ class Word:
 
 # A monitor's state (incidents.py moves it; stage 3).
 STATE = {
-    "new": Word("Waiting", "Not checked yet. The first check is on its way.", "quiet"),
+    "new": Word("Waiting", "Not checked yet. The first check is on its way.", "wait"),
     "steady": Word("Steady", "Up: the last checks answered as expected.", "steady"),
     "weak": Word("Weak Pulse", "Up, but slower than the limit you set.", "weak"),
     "irregular": Word("Irregular", "A check just failed. Pulse Check is checking again before it calls it down.",
@@ -61,9 +61,10 @@ ALERT = {
 # A member of the crew (worker.py), on the Crew page.
 WORKER = {
     "on": Word("On Duty", "Working: it wrote its heartbeat in the last 2 minutes.", "steady"),
-    "quiet": Word("Gone Quiet", "No heartbeat for over 2 minutes. It may be stuck on a slow check, or stopped.",
-                  "weak"),
-    "off": Word("Off Duty", "Stopped on purpose.", "quiet"),
+    "quiet": Word("Gone Quiet", "No heartbeat for over 6 minutes (a worker with nothing to do writes one at least "
+                                "every 5). It may be stuck, or stopping.", "weak"),
+    "off": Word("Off Duty", "Stopped: on purpose, or it has written no heartbeat for 15 minutes (the app restarted).",
+                "quiet"),
 }
 
 # Why a check failed, in plain words (probe.py sets error_kind).

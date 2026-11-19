@@ -9,7 +9,7 @@ from ..auth import login_required
 from ..models import Check, Incident
 
 bp = Blueprint("incidents", __name__)
-SHOWN = 50
+SHOWN = 300
 CHECKS_AROUND = timedelta(minutes=3)  # the incident page also shows the checks just before and after
 MAX_CHECKS = 200
 # Extra parts of one incident's page that later stages add: function(s, incident) -> dict.
@@ -36,7 +36,19 @@ def index():
     else:
         tab = "all"
     rows = s.scalars(base.order_by(Incident.resolved_at.is_not(None), Incident.opened_at.desc()).limit(SHOWN)).all()
-    return render_template("incidents.html", rows=rows, tab=tab, open_count=incidents.open_count(s, g.workspace.id))
+    return render_template("incidents.html", rows=rows, tab=tab, open_count=incidents.open_count(s, g.workspace.id),
+                           open_rows=[row for row in rows if row.is_open], groups=group(row for row in rows
+                                                                                        if not row.is_open))
+
+
+def group(rows):
+    """Resolved incidents, one group per monitor, the monitor with the latest incident first:
+    [(monitor, [incidents, newest first], seconds down in all)]."""
+    groups = {}
+    for incident in rows:
+        groups.setdefault(incident.monitor_id, (incident.monitor, []))[1].append(incident)
+    return [(monitor, found, sum((row.resolved_at - row.opened_at).total_seconds() for row in found))
+            for monitor, found in groups.values()]
 
 
 @bp.get("/incidents/<int:incident_id>")

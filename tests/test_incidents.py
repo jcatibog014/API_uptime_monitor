@@ -262,3 +262,16 @@ def test_the_crew_page_shows_the_self_check(app, owner, site):
         worker.simulate(db.session(), NINE, NINE + timedelta(seconds=30))
     page = words(client.get("/crew"))
     assert "Self-Check" in page and "Our own address" in page and "Keeps the free plan awake" in page
+
+
+def test_resolved_incidents_are_grouped_by_monitor(app, owner):
+    client, workspace_id = owner
+    scripted_monitor(app, workspace_id, lambda moment: not (
+        NINE <= moment < NINE + timedelta(minutes=4) or
+        NINE + timedelta(minutes=10) <= moment < NINE + timedelta(minutes=14)))
+    scripted_monitor(app, workspace_id, lambda moment: False, name="Search API")
+    play(app, 20)
+    page = client.get("/incidents").get_data(as_text=True)
+    assert "Down Now" in page and "Resolved, by Monitor" in page
+    assert page.count('class="incident-group"') == 1  # Payments API's two incidents, in one group
+    assert "2 incidents" in words(client.get("/incidents"))

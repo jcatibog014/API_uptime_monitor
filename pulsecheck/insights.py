@@ -58,7 +58,8 @@ class Budget:
 
     @property
     def level(self):
-        """good / warning / critical, for the meter's colour (always with its words beside it)."""
+        """good / warning / critical, for the meter's colour (always with its words beside it): green
+        with more than half left, amber with half or less, red when all of it is spent."""
         if self.used_s >= self.allowed_s:
             return "critical"
         return "warning" if self.used_share >= 0.5 else "good"

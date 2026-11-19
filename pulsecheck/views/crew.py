@@ -27,7 +27,7 @@ def worker_name(row, number):
 
 
 def worker_state(row, now):
-    if row.stopped_at is not None:
+    if row.stopped_at is not None or now - row.last_seen > worker.STOPPED_AFTER:
         return "off"
     return "quiet" if now - row.last_seen > worker.QUIET_AFTER else "on"
 
@@ -57,11 +57,16 @@ def index():
     now = utcnow()
     rows = s.scalars(select(Worker).where(Worker.last_seen >= now - timedelta(hours=1), Worker.kind != "rehearsal")
                      .order_by(Worker.started_at, Worker.id)).all()
+    # Workers that have stopped (a restart leaves its old four behind) are only counted, not listed.
+    states = [(row, worker_state(row, now)) for row in rows]
+    stopped = sum(1 for _row, state in states if state == "off")
     numbered, web_number = [], 0
-    for row in rows:
+    for row, state in states:
+        if state == "off":
+            continue
         if row.kind == "in the web app":
             web_number += 1
-        numbered.append((row, worker_name(row, web_number), worker_state(row, now)))
+        numbered.append((row, worker_name(row, web_number), state))
     counts = dict(s.execute(select(Job.status, func.count()).where(Job.workspace_id == g.workspace.id)
                             .group_by(Job.status)).all())
     dead = s.scalars(select(Job).where(Job.workspace_id == g.workspace.id, Job.status == queue.DEAD)
@@ -72,7 +77,7 @@ def index():
     on_duty = any(state == "on" for _row, _name, state in numbered)
     return render_template("crew.html", workers=numbered, counts=counts, dead=dead, gaps=gaps, kinds=KINDS,
                            canary=canary.latest(s), canary_on=bool(canary.targets(current_app.config)),
-                           lag_typical=typical, lag_worst=worst, lag_count=checked, on_duty=on_duty,
+                           lag_typical=typical, lag_worst=worst, lag_count=checked, on_duty=on_duty, stopped=stopped,
                            can_start=current_app.config.get("RUN_WORKER") and not worker.in_app_running())
 
 
