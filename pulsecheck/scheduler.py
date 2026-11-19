@@ -37,6 +37,7 @@ from .models import Gap, Monitor
 
 EPOCH = datetime(2026, 1, 1)  # every timetable is counted from here
 PER_ROUND = 200  # the most monitors one round starts (the rest are picked up a moment later)
+DIRECT_AHEAD = timedelta(seconds=59)  # how far one replay round looks ahead
 # Hooks run after a scheduled check is recorded: function(s, monitor, check, result, now).
 # incidents.py (stage 3) decides Steady / Irregular / Flatline here.
 after_check = []
@@ -72,6 +73,9 @@ def schedule(monitor, now, check_now=False):
     check_now: a new or resumed monitor is checked straight away."""
     if monitor.paused:
         monitor.next_check_at = None
+    elif monitor.kind == "heartbeat":  # nothing to call: due when its ping is late (heartbeat.py)
+        last = monitor.last_ping_at if monitor.last_ping_at and not check_now else now
+        monitor.next_check_at = last + timedelta(seconds=monitor.interval_s + monitor.grace_s)
     elif check_now:
         monitor.next_check_at = now.replace(microsecond=0)
     else:
@@ -83,14 +87,22 @@ def run_due(s, now, workspace_id=None, direct=False):
 
     direct: run each check straight away instead of queuing a job (the demo's replay:
     no network, and hours of checks must take seconds). Everything else is the same."""
+    horizon = now
+    if direct:
+        # A replay takes every monitor due in the next minute in one round (each checked at its
+        # own slot's time), but never past the next queued job: a re-check due at 9:00:20 must
+        # still be judged before the 9:01 check. Fewer rounds, the same story.
+        queued = queue.next_due(s, workspace_id)
+        horizon = min(now + DIRECT_AHEAD, max(now, queued)) if queued else now + DIRECT_AHEAD
     rows = s.execute(
         select(Monitor.id, Monitor.next_check_at, Monitor.interval_s, Monitor.workspace_id)
-        .where(Monitor.paused.is_(False), Monitor.next_check_at <= now,
+        .where(Monitor.paused.is_(False), Monitor.next_check_at <= horizon,
                queue.in_scope(Monitor.workspace_id, workspace_id))
         .order_by(Monitor.next_check_at).limit(PER_ROUND)).all()
     started = 0
     for monitor_id, planned, interval_s, owner_id in rows:
-        this_slot, following, skipped = plan(monitor_id, interval_s, planned, now)
+        moment = max(now, planned) if direct else now
+        this_slot, following, skipped = plan(monitor_id, interval_s, planned, moment)
         claimed = s.execute(update(Monitor).where(Monitor.id == monitor_id, Monitor.next_check_at == planned)
                             .values(next_check_at=following).execution_options(synchronize_session=False))
         if claimed.rowcount != 1:
@@ -98,8 +110,7 @@ def run_due(s, now, workspace_id=None, direct=False):
         if skipped:
             s.add(Gap(monitor_id=monitor_id, start=planned, end=this_slot, slots=skipped))
         if direct:
-            s.commit()
-            check_slot(s, monitor_id, this_slot, now)
+            check_slot(s, monitor_id, this_slot, moment)  # it commits the claim with its first step
         else:
             queue.enqueue(s, "check", {"monitor_id": monitor_id, "scheduled_at": this_slot.isoformat()},
                           run_at=now, workspace_id=owner_id, priority=3, max_attempts=2,

@@ -17,6 +17,7 @@ so a replay of hours of checks takes seconds.
 """
 import hashlib
 import random
+from functools import lru_cache
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urlsplit
@@ -65,14 +66,21 @@ def address(key, **params):
 
 def parse(url):
     """practice://shipping-api?down=2026-11-19T08:10&for=55 -> ("shipping-api", {"down": ..., "for": ...})."""
+    key, params = _parse(url)
+    return key, dict(params)
+
+
+@lru_cache(maxsize=1024)
+def _parse(url):  # the same few addresses are read thousands of times in a replay
     parts = urlsplit(url)
-    return parts.netloc, {name: values[0] for name, values in parse_qs(parts.query).items()}
+    return parts.netloc, tuple((name, values[0]) for name, values in parse_qs(parts.query).items())
 
 
 def is_practice(url):
     return (url or "").startswith(SCHEME) and parse(url)[0] in SERVICES
 
 
+@lru_cache(maxsize=4096)
 def _stable_number(*parts):
     """A number from text that is the same on every run (Python's hash() changes per process)."""
     return int.from_bytes(hashlib.sha256(":".join(str(part) for part in parts).encode()).digest()[:8], "big")
@@ -95,7 +103,8 @@ def in_outage(key, service, params, moment):
 
 def answer(url, moment, monitor_id=0, timeout=10, expected="200-299"):
     """What the practice service says to a check at `moment`, as a probe.Result."""
-    key, params = parse(url)
+    key, params = _parse(url)
+    params = dict(params)
     service = SERVICES[key]
     dice = random.Random(f"{key}:{monitor_id}:{moment.isoformat()}")
     result = probe.Result(final_url=url)  # no address: it never left Pulse Check
@@ -116,9 +125,15 @@ def answer(url, moment, monitor_id=0, timeout=10, expected="200-299"):
         result.status_code = 502
     else:
         low, high = service.slow if dice.random() < service.slow_share else service.fast
-        result.ttfb_ms = round(dice.uniform(low, high) - before_wait, 1)
+        target = dice.uniform(low, high)  # the whole answer; the wait is what the other parts leave
+        result.ttfb_ms = round(max(target - before_wait, target * 0.2), 1)
         result.status_code = 200
     result.total_ms = round(before_wait + result.ttfb_ms + dice.uniform(0.5, 3), 1)
+    if "cert" in params:  # the script's certificate end date (the demo's Images CDN runs out soon)
+        result.cert_expires_at, result.cert_issuer = datetime.fromisoformat(params["cert"]), "Practice CA"
+    if result.status_code == 200:  # a small health answer, so content rules have something to read
+        result.body = f'{{"status": "ok", "service": "{key}"}}'.encode()
+        result.headers = {"content-type": "application/json"}
     if probe.status_ok(result.status_code, expected):
         result.ok, result.message = True, probe.status_text(result.status_code)
     else:

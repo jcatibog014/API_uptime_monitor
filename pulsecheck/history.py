@@ -6,9 +6,9 @@ the incident list, but replaying 90 days of checks would take minutes. So
 the rollups before the replay are written straight from the same scripts the
 practice services answer from (practice.py):
 
-- the last 7 days: an hour row per hour, from the script's answer for every
-  slot of that hour (about 70,000 answers, under a second);
-- the 83 days before: a day row per day, from 48 sampled answers (spread
+- the last 7 days: an hour row per hour: every slot's outage minute counted
+  exactly, the errors and response times from 6 sampled answers an hour;
+- the 83 days before: a day row per day, from 24 sampled answers (spread
   over the day) for the response times and the share of errors, and the
   exact minutes of the Payments API's outages;
 - an Incident for every past Payments outage, like the live code would have
@@ -28,7 +28,7 @@ from .scheduler import offset_of
 
 HOUR_DAYS = 7
 DAYS = 90
-DAY_SAMPLES = 48
+DAY_SAMPLES = 24
 
 
 def _row(monitor_id, period, start, checks, failures, times):
@@ -55,15 +55,24 @@ def _row(monitor_id, period, start, checks, failures, times):
     return row
 
 
+HOUR_SAMPLES = 6
+
+
 def hour_rows(monitor, hour):
-    """Every slot of one hour, answered by the practice script."""
+    """One hour: every slot's outage minute counted exactly (cheap), the flaky errors and the
+    response times from 6 sampled answers (an answer is the expensive part)."""
+    key, params = practice.parse(monitor.url)
+    service = practice.SERVICES[key]
     first = hour + timedelta(seconds=offset_of(monitor.id, monitor.interval_s) % monitor.interval_s)
     slots = [first + timedelta(seconds=n * monitor.interval_s) for n in range(3600 // monitor.interval_s)]
     slots = [slot for slot in slots if slot < hour + timedelta(hours=1)]
+    down = sum(practice.in_outage(key, service, params, slot) for slot in slots)
+    picked = slots[::max(1, len(slots) // HOUR_SAMPLES)][:HOUR_SAMPLES]
     answers = [practice.answer(monitor.url, slot, monitor.id, monitor.timeout_s, monitor.expected_statuses)
-               for slot in slots]
-    return _row(monitor.id, "hour", hour, len(answers), sum(not answer.ok for answer in answers),
-                [answer.total_ms for answer in answers if answer.ok])
+               for slot in picked]
+    good = [answer for answer in answers if answer.ok]
+    flaky = round((len(slots) - down) * (len(answers) - len(good)) / len(answers)) if service.flaky_share else 0
+    return _row(monitor.id, "hour", hour, len(slots), min(len(slots), down + flaky), [answer.total_ms for answer in good])
 
 
 def day_row(monitor, day, following):
@@ -110,7 +119,7 @@ def build(s, workspace, by_service, start, now):
     zone_name = workspace.time_zone
     first_hour = floor_hour(start) - timedelta(days=HOUR_DAYS)
     hour_days_from = local_midnight(first_hour + timedelta(days=1), zone_name)  # whole days from hour rows
-    for monitor in by_service.values():
+    for monitor in [monitor for monitor in by_service.values() if monitor.kind == "practice"]:
         rows = []
         hour = first_hour
         while hour < floor_hour(start):

@@ -40,6 +40,7 @@ def record(s, monitor, result, scheduled_at, started_at, manual=False):
     check = Check(monitor_id=monitor.id, scheduled_at=scheduled_at, started_at=started_at, ok=result.ok,
                   manual=manual, error_kind=result.error_kind, message=(result.message or "")[:300],
                   status_code=result.status_code, remote_ip=result.remote_ip, dns_ms=result.dns_ms,
+                  slow=bool(result.ok and result.slow),
                   connect_ms=result.connect_ms, tls_ms=result.tls_ms, ttfb_ms=result.ttfb_ms,
                   total_ms=result.total_ms)
     try:

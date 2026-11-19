@@ -82,7 +82,8 @@ class Monitor(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(80))
-    # "http" (an address on the web); later stages add "practice", "tcp" and "heartbeat".
+    # "http" (an address on the web), "tcp" (a port: tcp://host:port), "heartbeat" (it calls us)
+    # or "practice" (the demo's pretend services, practice.py).
     kind: Mapped[str] = mapped_column(String(12), default="http", server_default="http")
     url: Mapped[str] = mapped_column(String(2000), default="", server_default="")
     method: Mapped[str] = mapped_column(String(8), default="GET", server_default="GET")
@@ -106,6 +107,22 @@ class Monitor(Base):
     judged_until: Mapped[datetime | None] = mapped_column(DateTime)
     # Optimistic locking: a save from a stale copy (another worker changed it meanwhile) fails.
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # Smarter checks (stage 6, checks_extra.py): what a good answer must say, and when it is too slow.
+    # assertions: {"contains": "...", "not_contains": "...", "json_path": "data.status", "json_value": "ok",
+    # "header": "x-version"}; empty keys are left out.
+    assertions: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
+    slow_ms: Mapped[int | None] = mapped_column(Integer)  # slower than this is a Weak Pulse
+    # A site on a free plan that sleeps and takes a minute to wake: wait up to 90 s for it.
+    sleepy: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Heartbeat monitors: their own address (/hb/<token>) that a cron job calls, and how late it may be.
+    heartbeat_token: Mapped[str | None] = mapped_column(String(40), unique=True)
+    grace_s: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_ping_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # The certificate (https), from the last check: when it runs out, who issued it, and the
+    # last warning sent (days left: 14, 7, 3 or 1), so each warning goes out once.
+    cert_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+    cert_issuer: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    cert_warned_days: Mapped[int | None] = mapped_column(Integer)
 
     workspace: Mapped[Workspace] = relationship()
 

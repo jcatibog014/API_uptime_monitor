@@ -535,6 +535,10 @@ tbody tr:hover { background: var(--row-hover); }
 .banner strong { display: block; }
 .banner a { color: inherit; font-weight: 600; }
 .banner-quiet { background: var(--surface); color: var(--ink); border-color: var(--rule); }
+.banner-warn { background: var(--pulse-weak-bg); color: var(--pulse-weak-ink); border-color: color-mix(in srgb, var(--pulse-weak-lamp) 45%, transparent); }
+.ping-card { margin-bottom: 1.2rem; }
+.copy-row { display: flex; gap: .6rem; align-items: center; }
+.copy-row input { font-family: var(--font-mono); font-size: .88rem; max-width: none; }
 .spinner { width: 1.1rem; height: 1.1rem; border-radius: 50%; border: 2px solid var(--rule); border-top-color: var(--accent); animation: spin .9s linear infinite; flex: 0 0 auto; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }

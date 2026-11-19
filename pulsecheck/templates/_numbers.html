@@ -18,6 +18,7 @@
       <div class="readout">{{ uptime(numbers.ok, numbers.counted) }}</div>
       <div class="stat-note">{{ plural(numbers.counted, 'check') }}{% if numbers.missed %}, {{ numbers.missed|number }} not made{% endif %}</div>
     </div>
+    {% if monitor.kind != 'heartbeat' %}
     <div class="stat">
       <div class="stat-label">Typical</div>
       <div class="readout">{% if numbers.ok %}{{ approx }}{{ numbers.percentile(50)|ms }}{% else %}–{% endif %}</div>
@@ -33,6 +34,7 @@
       <div class="readout">{% if numbers.ok %}{{ approx }}{{ numbers.percentile(99)|ms }}{% else %}–{% endif %}</div>
       <div class="stat-note">Slower than this (p99)</div>
     </div>
+    {% endif %}
     <div class="stat{% if incident_count %} stat-flat{% endif %}">
       <div class="stat-label">Incidents</div>
       <div class="readout">{{ incident_count }}</div>
@@ -40,6 +42,7 @@
     </div>
   </div>
 
+  {% if monitor.kind != 'heartbeat' %}
   <div class="grid grid-chart">
     <section class="card chart-card">
       <div class="card-head">
@@ -99,6 +102,7 @@
     </section>
     {% endif %}
   </div>
+  {% endif %}
 
   <section class="card top-gap">
     <div class="card-head">

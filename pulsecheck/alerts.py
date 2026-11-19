@@ -97,6 +97,15 @@ def raise_alert(s, monitor, incident, event, now, channels=None, seq=0):
     return made
 
 
+def raise_monitor_alert(s, monitor, event, seq, now, title, body):
+    """An alert about a monitor that isn't an incident (a certificate running out). The caller
+    makes sure it is raised once (certificates.py remembers the last warning)."""
+    made = []
+    for channel in enabled_channels(s, monitor.workspace_id):
+        made.append(make(s, channel, event, title, body, site(f"/monitors/{monitor.id}"), now, seq=seq))
+    return [alert for alert in made if alert is not None]
+
+
 def send_test(s, channel, now):
     workspace = s.get(Workspace, channel.workspace_id)
     title, body, link = compose("test", None, None, workspace, now)

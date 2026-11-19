@@ -87,7 +87,7 @@ def test_a_demo_starts_replaying_and_then_has_a_past(app):
     with app.app_context():
         s = db.session()
         monitors = s.scalars(select(Monitor).where(Monitor.workspace_id == workspace.id)).all()
-        assert len(monitors) == len(seed.MONITORS) and all(m.kind == "practice" for m in monitors)
+        assert sorted(m.kind for m in monitors) == ["heartbeat"] + ["practice"] * len(seed.MONITORS)
         checks = s.scalar(select(func.count()).select_from(Check).join(Monitor)
                           .where(Monitor.workspace_id == workspace.id))
         assert checks > 3 * 60 * 5  # hours of checks
@@ -97,7 +97,7 @@ def test_a_demo_starts_replaying_and_then_has_a_past(app):
         assert any(i.is_open and i.monitor_id == shipping.id for i in incidents)
         assert any(not i.is_open for i in incidents)  # a payments outage or a flaky partner, already over
         # The live crew carries on from now.
-        assert all(m.next_check_at >= utcnow() - timedelta(minutes=2) for m in monitors)
+        assert all(m.next_check_at >= utcnow() - timedelta(minutes=2) for m in monitors if m.kind == "practice")
     assert seconds < 60, f"The replay took {seconds:.1f} s"
     print(f"\nreplay: {seconds:.1f} s for {checks} checks")
 
@@ -186,3 +186,11 @@ def test_there_is_a_limit_on_demos(app, monkeypatch):
 def test_the_login_page_offers_the_demo(client):
     page = text(client.get("/login"))
     assert "Explore the Demo" in page and "Try the demo" in page
+
+
+def test_practice_parts_are_never_negative():
+    for key in practice.SERVICES:
+        for n in range(300):
+            result = practice.answer(practice.address(key), NINE + timedelta(minutes=n))
+            assert all(part is None or part >= 0 for part in (result.dns_ms, result.connect_ms, result.tls_ms,
+                                                              result.ttfb_ms)), (key, n)

@@ -21,6 +21,7 @@ import socket
 import ssl
 import time
 from dataclasses import dataclass, field
+from functools import lru_cache
 from datetime import UTC, datetime
 from http import HTTPStatus
 from urllib.parse import urljoin, urlsplit
@@ -52,6 +53,7 @@ class Result:
     headers: dict = field(default_factory=dict)
     cert_expires_at: datetime | None = None  # naive UTC
     cert_issuer: str = ""
+    slow: bool = False  # up, but slower than the monitor's limit (rules.py)
 
     def add(self, part, milliseconds):
         """Add time to a part. With redirects a part happens more than once: the parts add up."""
@@ -66,10 +68,11 @@ class Failure(Exception):
 
 # ---------- Which status codes count as up ----------
 
+@lru_cache(maxsize=256)
 def parse_statuses(text):
     """'200-299' or '200, 204, 301-302' -> [(200, 299)] or [(200, 200), (204, 204), (301, 302)].
     Raises ValueError for anything else."""
-    ranges = []
+    ranges = []  # a tuple below: the answer is cached, so it must not be changed by a caller
     for part in (text or "").replace(" ", "").split(","):
         if not part:
             continue
@@ -80,7 +83,7 @@ def parse_statuses(text):
         ranges.append((low, high))
     if not ranges:
         raise ValueError("empty")
-    return ranges
+    return tuple(ranges)
 
 
 def statuses_problem(text):
@@ -215,6 +218,41 @@ def _fetch(result, url, method, deadline, timeout, allow_private, resolver, cloc
             continue
         result.final_url, result.body = url, body
         return
+
+
+def check_tcp(host, port, *, timeout=10.0, allow_private=False, resolver=socket.getaddrinfo,
+              clock=time.perf_counter):
+    """Can we open a connection to this port? (A database, a mail server, a game server: anything
+    that isn't a web page.) Up = the connection opened; nothing is sent. Never raises."""
+    result = Result(final_url=f"tcp://{host}:{port}")
+    started = clock()
+    try:
+        moment = clock()
+        try:
+            answers = resolver(host, port, type=socket.SOCK_STREAM)
+        except (socket.gaierror, UnicodeError):
+            raise Failure("dns", f"The name {host} wasn't found.") from None
+        result.dns_ms = round((clock() - moment) * 1000, 1)
+        allowed = [answer[4][0] for answer in answers if targets.allowed_ip(answer[4][0], allow_private)]
+        if not allowed:
+            raise Failure("blocked", targets.BLOCKED_MESSAGE)
+        result.remote_ip = allowed[0]
+        moment = clock()
+        with socket.socket(socket.AF_INET6 if ":" in allowed[0] else socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout)
+            sock.connect((allowed[0], port))
+        result.connect_ms = round((clock() - moment) * 1000, 1)
+        result.ok, result.message = True, f"Port {port} is open."
+    except Failure as failure:
+        result.error_kind, result.message = failure.kind, failure.message
+    except TimeoutError:
+        result.error_kind, result.message = "timeout", f"No answer within {timeout:g} s."
+    except ConnectionRefusedError:
+        result.error_kind, result.message = "refused", f"{host} refused the connection on port {port}."
+    except OSError as error:
+        result.error_kind, result.message = "connection", f"The connection failed ({type(error).__name__})."
+    result.total_ms = round((clock() - started) * 1000, 1)
+    return result
 
 
 def read_certificate(result, certificate):

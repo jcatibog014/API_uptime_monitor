@@ -123,8 +123,8 @@ def test_a_public_page_cant_redirect_inward(site, monkeypatch):
 
 
 def test_statuses_are_read_like_people_write_them():
-    assert probe.parse_statuses("200-299") == [(200, 299)]
-    assert probe.parse_statuses(" 200, 204 ,301-302") == [(200, 200), (204, 204), (301, 302)]
+    assert probe.parse_statuses("200-299") == ((200, 299),)
+    assert probe.parse_statuses(" 200, 204 ,301-302") == ((200, 200), (204, 204), (301, 302))
     for bad in ("", "abc", "99", "600", "300-200", "200-"):
         assert probe.statuses_problem(bad), bad
 

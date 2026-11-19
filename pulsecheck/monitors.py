@@ -7,7 +7,7 @@ checking.py does.
 from flask import abort, g
 from sqlalchemy import func, select
 
-from . import practice, probe, targets
+from . import heartbeat, practice, probe, rules, targets
 from .models import Monitor
 
 NAME_MAX_LENGTH = 80
@@ -41,15 +41,25 @@ def count(s, workspace_id):
     return s.scalar(select(func.count()).select_from(Monitor).where(Monitor.workspace_id == workspace_id))
 
 
-def defaults():
-    return {"name": "", "url": "", "method": "GET", "expected_statuses": "200-299", "timeout_s": 10,
-            "interval_s": 60}
+KINDS = {"http": "Web Address", "tcp": "TCP Port", "heartbeat": "Heartbeat"}
+SLOW_LIMITS = [("", "No limit"), (300, "300 ms"), (500, "500 ms"), (1000, "1 second"), (2000, "2 seconds"),
+               (5000, "5 seconds")]
+TEXT_MAX = 200  # a rule's words
+
+
+def defaults(kind="http"):
+    return {"kind": kind, "name": "", "url": "", "host": "", "port": "", "service": "", "method": "GET",
+            "expected_statuses": "200-299", "timeout_s": 10, "interval_s": 3600 if kind == "heartbeat" else 60,
+            "grace_s": 300, "slow_ms": "", "sleepy": False, **{key: "" for key in rules.RULE_KEYS}}
 
 
 def values_of(monitor):
-    return {"name": monitor.name, "url": monitor.url, "service": practice.parse(monitor.url)[0],
-            "method": monitor.method, "expected_statuses": monitor.expected_statuses,
-            "timeout_s": monitor.timeout_s, "interval_s": monitor.interval_s}
+    host, port = rules.tcp_address(monitor.url) if monitor.kind == "tcp" else ("", "")
+    return {"kind": monitor.kind, "name": monitor.name, "url": monitor.url, "host": host or "", "port": port or "",
+            "service": practice.parse(monitor.url)[0], "method": monitor.method,
+            "expected_statuses": monitor.expected_statuses, "timeout_s": monitor.timeout_s,
+            "interval_s": monitor.interval_s, "grace_s": monitor.grace_s, "slow_ms": monitor.slow_ms or "",
+            "sleepy": monitor.sleepy, **{key: (monitor.assertions or {}).get(key, "") for key in rules.RULE_KEYS}}
 
 
 def _choice(form, name, choices, default):
@@ -60,53 +70,102 @@ def _choice(form, name, choices, default):
     return value if value in dict(choices) else None
 
 
-def read_form(form, allow_private=False, demo=False):
+def read_form(form, allow_private=False, demo=False, kind=None):
     """(values, errors) from a monitor form. errors is empty when it can be saved.
-    demo: a demo's monitor checks one of the practice services (practice.py), never a real address."""
-    service = form.get("service", "")
-    values = {
-        "name": " ".join(form.get("name", "").split()),
-        "kind": "practice" if demo else "http",
-        "service": service,  # only for showing the form again; not a column
-        "url": practice.address(service) if demo else targets.clean_url(form.get("url", "")),
-        "method": form.get("method", "GET").upper(),
-        "expected_statuses": " ".join(form.get("expected_statuses", "").split()) or "200-299",
-        "timeout_s": _choice(form, "timeout_s", TIMEOUTS, 10),
-        "interval_s": _choice(form, "interval_s", INTERVALS, 60),
-    }
+    values holds only columns of Monitor, plus a few keys starting with "_" that only
+    re-show the form. demo: a demo's monitor checks one of the practice services."""
+    kind = "practice" if demo else (kind or form.get("kind", "http"))
+    if kind not in KINDS and kind != "practice":
+        kind = "http"
     errors = {}
+    values = {"kind": kind, "name": " ".join(form.get("name", "").split())}
+    shown = {"service": form.get("service", ""), "host": form.get("host", "").strip(), "port": form.get("port", "").strip()}
     if not values["name"]:
         errors["name"] = "Give the monitor a name, like Payments API."
     elif len(values["name"]) > NAME_MAX_LENGTH:
         errors["name"] = f"Use at most {NAME_MAX_LENGTH} characters."
-    if demo:
-        if service not in practice.SERVICES:
+
+    if kind == "heartbeat":
+        values["interval_s"] = _choice(form, "interval_s", heartbeat.EVERY, 3600)
+        values["grace_s"] = _choice(form, "grace_s", heartbeat.GRACE, 300)
+        values["url"], values["confirm_tries"], values["recover_tries"] = "", 1, 1
+        if values["interval_s"] is None:
+            errors["interval_s"] = "Choose how often from the list."
+        if values["grace_s"] is None:
+            errors["grace_s"] = "Choose a time from the list."
+        return {**values, **{f"_{key}": value for key, value in shown.items()}}, errors
+
+    values["interval_s"] = _choice(form, "interval_s", INTERVALS, 60)
+    values["timeout_s"] = _choice(form, "timeout_s", TIMEOUTS, 10)
+    values["slow_ms"] = _choice(form, "slow_ms", SLOW_LIMITS[1:], None) if form.get("slow_ms") else None
+    if form.get("slow_ms") and values["slow_ms"] is None:
+        errors["slow_ms"] = "Choose a limit from the list."
+    if kind == "practice":
+        values["url"] = practice.address(shown["service"])
+        if shown["service"] not in practice.SERVICES:
             errors["service"] = "Choose a practice service from the list."
-    elif problem := targets.url_problem(values["url"], allow_private):
-        errors["url"] = problem
-    if values["method"] not in probe.METHODS:
-        errors["method"] = "Choose GET, HEAD or POST."
-    if problem := probe.statuses_problem(values["expected_statuses"]):
-        errors["expected_statuses"] = problem
+    elif kind == "tcp":
+        host, port = shown["host"], shown["port"]
+        if not host:
+            errors["host"] = "Enter the server's name or address."
+        elif not port.isdigit() or not 1 <= int(port) <= 65535:
+            errors["port"] = "Enter a port from 1 to 65535."
+        else:
+            values["url"] = f"tcp://{host}:{int(port)}"
+            if problem := targets.url_problem(f"http://{host}:{int(port)}/", allow_private):
+                errors["host"] = problem
+        values["sleepy"] = False
+    else:
+        values["url"] = targets.clean_url(form.get("url", ""))
+        values["method"] = form.get("method", "GET").upper()
+        values["expected_statuses"] = " ".join(form.get("expected_statuses", "").split()) or "200-299"
+        values["sleepy"] = form.get("sleepy") == "1"
+        values["assertions"] = {key: form.get(key, "").strip()[:TEXT_MAX] for key in rules.RULE_KEYS
+                                if form.get(key, "").strip()}
+        if values["assertions"].get("json_value") and not values["assertions"].get("json_path"):
+            errors["json_path"] = "Say where the value is, like data.status."
+        if problem := targets.url_problem(values["url"], allow_private):
+            errors["url"] = problem
+        if values["method"] not in probe.METHODS:
+            errors["method"] = "Choose GET, HEAD or POST."
+        if problem := probe.statuses_problem(values["expected_statuses"]):
+            errors["expected_statuses"] = problem
     if values["timeout_s"] is None:
         errors["timeout_s"] = "Choose a time from the list."
     if values["interval_s"] is None:
         errors["interval_s"] = "Choose how often from the list."
-    if not errors and values["timeout_s"] >= values["interval_s"]:
-        errors["timeout_s"] = "The wait must be shorter than the time between checks."
-    return values, errors
+    wait = rules.SLEEPY_TIMEOUT if values.get("sleepy") else values["timeout_s"]
+    if not errors and wait >= values["interval_s"]:
+        if values.get("sleepy"):
+            errors["interval_s"] = "A sleepy site may need 90 seconds to wake: check it every 2 minutes or less often."
+        else:
+            errors["timeout_s"] = "The wait must be shorter than the time between checks."
+    return {**values, **{f"_{key}": value for key, value in shown.items()}}, errors
 
 
 def save(s, workspace, values, monitor=None):
     """Make a new monitor or change one (the caller commits). Returns it."""
     if monitor is None:
-        monitor = Monitor(workspace_id=workspace.id)
+        monitor = Monitor(workspace_id=workspace.id, kind=values["kind"])
         s.add(monitor)
-    same_service = practice.is_practice(values["url"]) and monitor.url \
-        and practice.parse(monitor.url)[0] == practice.parse(values["url"])[0]
+        if values["kind"] == "heartbeat":
+            monitor.heartbeat_token = heartbeat.new_token()
+    same_service = (practice.is_practice(values.get("url", "")) and monitor.url
+                    and practice.parse(monitor.url)[0] == practice.parse(values["url"])[0])
     for key, value in values.items():
-        if key == "service" or (key == "url" and same_service):
+        if key.startswith("_") or key == "kind" or (key == "url" and same_service):
             continue  # the same practice service: keep its script's settings (like the demo's outage time)
         setattr(monitor, key, value)
     s.flush()
     return monitor
+
+
+def form_values(values):
+    """The values as the form shows them again (after a mistake)."""
+    shown = {key: value for key, value in values.items() if not key.startswith("_")}
+    shown.update({key[1:]: value for key, value in values.items() if key.startswith("_")})
+    for key in rules.RULE_KEYS:
+        shown[key] = (values.get("assertions") or {}).get(key, "")
+    shown.setdefault("slow_ms", "")
+    shown["slow_ms"] = shown["slow_ms"] or ""
+    return {**defaults(values["kind"]), **shown}

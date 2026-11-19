@@ -38,6 +38,7 @@ SHIPPING_DOWN_FOR = 55  # minutes
 # The Payments API's outages come every few hours (practice.py); one is set inside the replayed
 # hours too, so every demo has an incident that is already over.
 PAYMENTS_DOWN_BEFORE = timedelta(minutes=105)
+CERT_LEFT = timedelta(days=9, hours=6)  # the Images CDN's certificate: a warning at 14 days goes out
 # (name, practice service, how often in seconds)
 MONITORS = [
     ("Website", "website", 60),
@@ -49,6 +50,10 @@ MONITORS = [
     ("Shipping API", "shipping-api", 60),
     ("Images CDN", "images-cdn", 300),
 ]
+# Smarter checks (stage 6) on some of them: a speed limit (Weak Pulse), and a rule about the answer.
+EXTRAS = {"search-api": {"slow_ms": 1200},
+          "booking-api": {"assertions": {"json_path": "status", "json_value": "ok"}},
+          "website": {"assertions": {"contains": "ok"}}}
 # More sample data from later stages: function(s, workspace, monitors_by_service, start, now).
 # Runs in build(), before the replay.
 extras = []
@@ -78,12 +83,14 @@ def build(s, now):
         if service == "shipping-api":
             down = (now - SHIPPING_DOWN_BEFORE).replace(second=0, microsecond=0)
             params = {"down": down.isoformat(timespec="minutes"), "for": SHIPPING_DOWN_FOR}
+        elif service == "images-cdn":
+            params = {"cert": (now + CERT_LEFT).isoformat(timespec="minutes")}
         elif service == "payments-api":
             down = (now - PAYMENTS_DOWN_BEFORE).replace(second=0, microsecond=0)
             params = {"down": down.isoformat(timespec="minutes"), "for": 7}
         monitor = Monitor(workspace_id=workspace.id, name=monitor_name, kind="practice",
                           url=practice.address(service, **params), interval_s=interval, next_check_at=start,
-                          created_at=start, state="new")
+                          created_at=start, state="new", **EXTRAS.get(service, {}))
         s.add(monitor)
         by_service[service] = monitor
     s.flush()

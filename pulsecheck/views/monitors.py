@@ -1,7 +1,7 @@
 """Monitor pages: the list, add, change, delete, one monitor's page, and Check now."""
-from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
-from .. import checking, db, incidents, limits, monitors, practice, probe, scheduler, worker
+from .. import checking, db, heartbeat, incidents, limits, monitors, practice, probe, scheduler, worker
 from ..auth import login_required
 from ..dates import utcnow
 
@@ -23,8 +23,10 @@ def changed(s, monitor, moment):
 
 
 def form_page(template, values, errors, monitor=None):
-    return render_template(template, values=values, errors=errors, monitor=monitor,
+    shown = monitors.form_values(values) if errors else values
+    return render_template(template, values=shown, errors=errors, monitor=monitor, kinds=monitors.KINDS,
                            intervals=monitors.INTERVALS, timeouts=monitors.TIMEOUTS,
+                           every=heartbeat.EVERY, graces=heartbeat.GRACE, slow_limits=monitors.SLOW_LIMITS,
                            services=practice.choices(),
                            methods=[(method, method) for method in probe.METHODS]), 400 if errors else 200
 
@@ -46,7 +48,9 @@ def new():
               "Delete one to add another.", "error")
         return redirect(url_for("monitors.index"))
     if request.method == "GET":
-        return form_page("monitor_form.html", monitors.defaults(), {})
+        kind = "practice" if g.workspace.is_demo else request.args.get("kind", "http")
+        return form_page("monitor_form.html", monitors.defaults(kind if kind in monitors.KINDS else
+                                                                "practice" if g.workspace.is_demo else "http"), {})
     values, errors = monitors.read_form(request.form, current_app.config["ALLOW_PRIVATE_TARGETS"], g.workspace.is_demo)
     if errors:
         return form_page("monitor_form.html", values, errors)
@@ -76,12 +80,13 @@ def edit(monitor_id):
     monitor = monitors.get(s, monitor_id)
     if request.method == "GET":
         return form_page("monitor_form.html", monitors.values_of(monitor), {}, monitor)
-    values, errors = monitors.read_form(request.form, current_app.config["ALLOW_PRIVATE_TARGETS"], g.workspace.is_demo)
+    values, errors = monitors.read_form(request.form, current_app.config["ALLOW_PRIVATE_TARGETS"], g.workspace.is_demo,
+                                        kind=monitor.kind)
     if errors:
         return form_page("monitor_form.html", values, errors, monitor)
-    old_interval = monitor.interval_s
+    old_interval, old_grace = monitor.interval_s, monitor.grace_s
     monitors.save(s, g.workspace, values, monitor)
-    if monitor.interval_s != old_interval:
+    if monitor.interval_s != old_interval or monitor.grace_s != old_grace:
         scheduler.schedule(monitor, utcnow())  # onto the new timetable
     changed(s, monitor, utcnow())
     flash("The monitor is saved.")
@@ -115,12 +120,31 @@ def pause(monitor_id):
     return redirect(url_for("monitors.page", monitor_id=monitor.id))
 
 
+@bp.post("/<int:monitor_id>/ping")
+@login_required
+def test_ping(monitor_id):
+    """A heartbeat monitor's ping, sent from its own page (what the job's call would do)."""
+    s = db.session()
+    monitor = monitors.get(s, monitor_id)
+    if monitor.kind != "heartbeat":
+        abort(404)
+    if monitor.paused:
+        flash("It is paused: resume it first.", "error")
+    else:
+        heartbeat.ping(s, monitor, utcnow())
+        s.commit()
+        flash("Ping received. The next one is expected within its time.")
+    return redirect(url_for("monitors.page", monitor_id=monitor.id))
+
+
 @bp.post("/<int:monitor_id>/check")
 @login_required
 def check_now(monitor_id):
     """Check it straight away, inside this request (the result is on the page that comes back)."""
     s = db.session()
     monitor = monitors.get(s, monitor_id)
+    if monitor.kind == "heartbeat":
+        abort(404)
     moment = utcnow()
     if not limits.hit(s, f"check-now:{g.workspace.id}", CHECK_NOW_PER_MINUTE, 60, moment):
         s.commit()
@@ -139,6 +163,23 @@ def check_now(monitor_id):
 
 def init_app(app):
     app.jinja_env.globals["monitor_interval"] = lambda monitor: monitors.interval_words(monitor.interval_s)
-    # A practice address keeps its script's settings after "?" (practice.py): not for people to read.
-    app.jinja_env.globals["monitor_address"] = lambda monitor: (
-        monitor.url.split("?")[0] if monitor.kind == "practice" else monitor.url)
+    app.jinja_env.globals["monitor_address"] = address
+    app.jinja_env.globals["heartbeat_every"] = lambda monitor: dict(heartbeat.EVERY).get(
+        monitor.interval_s, monitors.interval_words(monitor.interval_s))
+    if cert_extras not in page_extras:
+        page_extras.append(cert_extras)
+
+
+def address(monitor):
+    """What the pages show as a monitor's address. A practice address keeps its script's settings
+    after "?" (practice.py): not for people to read. A heartbeat has no address of ours to call."""
+    if monitor.kind == "practice":
+        return monitor.url.split("?")[0]
+    if monitor.kind == "heartbeat":
+        return "Heartbeat: your job calls Pulse Check"
+    return monitor.url
+
+
+def cert_extras(s, monitor):
+    from .. import certificates
+    return {"cert_days": certificates.days_left(monitor, utcnow())}

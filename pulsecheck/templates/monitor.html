@@ -10,10 +10,17 @@
       {{ csrf() }}
       <button class="button button-quiet" type="submit">{{ icon('play' if monitor.paused else 'pause') }} {{ 'Resume checks' if monitor.paused else 'Pause checks' }}</button>
     </form>
-    <form method="post" action="{{ url_for('monitors.check_now', monitor_id=monitor.id) }}">
-      {{ csrf() }}
-      <button class="button" type="submit">{{ icon('monitors') }} Check now</button>
-    </form>
+    {% if monitor.kind == 'heartbeat' %}
+      <form method="post" action="{{ url_for('monitors.test_ping', monitor_id=monitor.id) }}">
+        {{ csrf() }}
+        <button class="button" type="submit">{{ icon('monitors') }} Send a test ping</button>
+      </form>
+    {% else %}
+      <form method="post" action="{{ url_for('monitors.check_now', monitor_id=monitor.id) }}">
+        {{ csrf() }}
+        <button class="button" type="submit">{{ icon('monitors') }} Check now</button>
+      </form>
+    {% endif %}
   {% endcall %}
 
   {% set last = checks[0] if checks else None %}
@@ -21,6 +28,24 @@
     {{ monitor_state(monitor) }}
     <span class="address">{% if monitor.kind == 'http' %}{{ monitor.method }} {% endif %}{{ monitor_address(monitor) }}</span>
   </div>
+
+  {% if monitor.kind == 'heartbeat' and monitor.heartbeat_token %}
+    <section class="card ping-card">
+      <div class="card-head"><h2>Its Address</h2></div>
+      <p class="muted">Call this when your job finishes. Keep it secret: anyone with it can send pings.</p>
+      <div class="copy-row top-gap">
+        <input type="text" id="ping-url" value="{{ config.BASE_URL }}/hb/{{ monitor.heartbeat_token }}" readonly>
+        <button class="button button-quiet" type="button" data-copy="ping-url" hidden>Copy</button>
+      </div>
+      <p class="small muted top-gap">From a script: <code>curl -fsS {{ config.BASE_URL }}/hb/{{ monitor.heartbeat_token }}</code></p>
+    </section>
+  {% endif %}
+
+  {% if cert_days is defined and cert_days is not none and cert_days <= 14 %}
+    <div class="banner banner-warn" role="status">
+      <div><strong>The certificate runs out in {{ plural(cert_days|int, 'day') }}</strong>On {{ monitor.cert_expires_at|nice_date }}. Renew it before then, or browsers and apps will refuse to connect.</div>
+    </div>
+  {% endif %}
 
   {% if open_incident %}
     <div class="banner" role="status">
@@ -36,8 +61,17 @@
 
   <div class="split">
     <section class="card">
-      <div class="card-head"><h2>Latest Check</h2></div>
-      {% if last %}
+      <div class="card-head"><h2>{{ 'Latest Ping' if monitor.kind == 'heartbeat' else 'Latest Check' }}</h2></div>
+      {% if last and monitor.kind == 'heartbeat' %}
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">{{ 'Last ping' if last.ok else 'Missing since' }}</div>
+            <div class="readout readout-word">{{ (monitor.last_ping_at or last.scheduled_at)|ago }}</div>
+          </div>
+        </div>
+        <p>{% if not last.ok %}<strong>{{ error_label(last.error_kind) }}:</strong> {% endif %}{{ last.message }}</p>
+        <p class="muted small">{{ last.scheduled_at|nice_datetime }}</p>
+      {% elif last %}
         <div class="stats">
           <div class="stat">
             <div class="stat-label">Response</div>
@@ -60,18 +94,30 @@
         <p class="top-gap">{% if not last.ok %}<strong>{{ error_label(last.error_kind) }}:</strong> {% endif %}{{ last.message }}</p>
         <p class="muted small">{{ last.started_at|nice_datetime }}{% if last.remote_ip %} · from {{ last.remote_ip }}{% endif %}{% if last.manual %} · Check now{% endif %}</p>
       {% else %}
-        <p class="muted">Not checked yet. Press Check now to check it straight away.</p>
+        <p class="muted">{% if monitor.kind == 'heartbeat' %}No ping yet. Call its address (below) from your job, or press Send a test ping.{% else %}Not checked yet. Press Check now to check it straight away.{% endif %}</p>
       {% endif %}
     </section>
     <section class="card">
       <div class="card-head"><h2>Settings</h2></div>
       <dl class="facts">
-        <dt>How often</dt><dd>{{ interval_words }}</dd>
-        <dt>Next check</dt><dd>{% if monitor.paused %}Paused{% elif monitor.next_check_at %}{{ monitor.next_check_at|clock }} ({{ monitor.next_check_at|from_now }}){% else %}–{% endif %}</dd>
-        <dt>Wait</dt><dd>{{ monitor.timeout_s }} seconds</dd>
-        <dt>Good answers</dt><dd>{{ monitor.expected_statuses }}</dd>
-        <dt>Down after</dt><dd>{{ monitor.confirm_tries }} failed checks in a row</dd>
-        <dt>Up again after</dt><dd>{{ monitor.recover_tries }} good checks in a row</dd>
+        {% if monitor.kind == 'heartbeat' %}
+          <dt>Expected</dt><dd>{{ heartbeat_every(monitor) }}, late after {{ monitor.grace_s|duration }} more</dd>
+          <dt>Last ping</dt><dd>{{ monitor.last_ping_at|nice_datetime if monitor.last_ping_at else 'None yet' }}</dd>
+          <dt>Missing after</dt><dd>{% if monitor.paused %}Paused{% elif monitor.next_check_at %}{{ monitor.next_check_at|nice_datetime }}{% else %}–{% endif %}</dd>
+        {% else %}
+          <dt>How often</dt><dd>{{ interval_words }}</dd>
+          <dt>Next check</dt><dd>{% if monitor.paused %}Paused{% elif monitor.next_check_at %}{{ monitor.next_check_at|clock }} ({{ monitor.next_check_at|from_now }}){% else %}–{% endif %}</dd>
+          <dt>Wait</dt><dd>{{ monitor.timeout_s }} seconds{% if monitor.sleepy %}, or 90 for a sleepy site{% endif %}</dd>
+          {% if monitor.kind == 'http' %}<dt>Good answers</dt><dd>{{ monitor.expected_statuses }}</dd>{% endif %}
+          {% if monitor.slow_ms %}<dt>Slow after</dt><dd>{{ monitor.slow_ms|ms }}</dd>{% endif %}
+          {% for key, label in [('contains', 'Must contain'), ('not_contains', 'Must not contain'), ('header', 'Must have the header')] %}
+            {% if monitor.assertions and monitor.assertions.get(key) %}<dt>{{ label }}</dt><dd><code>{{ monitor.assertions[key] }}</code></dd>{% endif %}
+          {% endfor %}
+          {% if monitor.assertions and monitor.assertions.get('json_path') %}<dt>JSON value</dt><dd><code>{{ monitor.assertions.json_path }}</code>{% if monitor.assertions.get('json_value') %} = <code>{{ monitor.assertions.json_value }}</code>{% endif %}</dd>{% endif %}
+          {% if monitor.cert_expires_at %}<dt>Certificate</dt><dd>Runs out {{ monitor.cert_expires_at|nice_date }}{% if monitor.cert_issuer %} ({{ monitor.cert_issuer }}){% endif %}</dd>{% endif %}
+        {% endif %}
+        <dt>Down after</dt><dd>{{ plural(monitor.confirm_tries, 'failed check') }} in a row</dd>
+        <dt>Up again after</dt><dd>{{ plural(monitor.recover_tries, 'good check') }} in a row</dd>
         {% for template_name in monitor_facts|default([]) %}{% include template_name %}{% endfor %}
       </dl>
       <form method="post" action="{{ url_for('monitors.delete', monitor_id=monitor.id) }}" class="top-gap"
@@ -110,15 +156,18 @@
     {% if checks %}
       <div class="table-wrap">
         <table class="fit-table check-table">
-          <thead><tr><th>When</th><th>Result</th><th class="num">Status</th><th class="num">Response</th><th>Where the Time Went</th><th>Note</th></tr></thead>
+          {% set timed = monitor.kind != 'heartbeat' %}
+          <thead><tr><th>When</th><th>Result</th>{% if timed %}<th class="num">Status</th><th class="num">Response</th><th>Where the Time Went</th>{% endif %}<th>Note</th></tr></thead>
           <tbody>
             {% for check in checks %}
               <tr>
                 <td>{{ check.scheduled_at|check_time }}</td>
                 <td>{{ check_result(check) }}</td>
+                {% if timed %}
                 <td class="num" data-label="Status">{{ check.status_code or '–' }}</td>
                 <td class="num" data-label="Response">{{ check.total_ms|ms }}</td>
                 <td>{{ phases(check) }}</td>
+                {% endif %}
                 <td class="small">{% if not check.ok %}{{ error_label(check.error_kind) }}{% else %}{{ check.message }}{% endif %}</td>
               </tr>
             {% endfor %}
