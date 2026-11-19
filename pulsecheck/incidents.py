@@ -40,6 +40,8 @@ on_open = []
 on_resolve = []
 # Called on every state change: function(s, monitor, old_state, now).
 on_move = []
+# Asked first by judge(): function(s, monitor, check, now) -> True to judge no further (maintenance.py).
+before_judge = []
 NETWORK_KINDS = ("http", "tcp")  # kinds that go over our connection (the canary can excuse them)
 
 
@@ -62,6 +64,8 @@ def judge(s, monitor, check, now):
         return  # older than (or the same as) a check already judged: never count it twice
     monitor.judged_until = check.scheduled_at
     if monitor.paused:
+        return
+    if any(hook(s, monitor, check, now) for hook in before_judge):
         return
     if not check.ok and monitor.kind in NETWORK_KINDS and canary.our_side_down(s, now):
         check.our_side = True  # our connection is failing: this says nothing about the service

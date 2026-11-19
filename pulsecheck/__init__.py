@@ -118,10 +118,10 @@ def create_app(test_config=None):
         raise RuntimeError("Set the DATABASE_URL environment variable on Render (Supabase's connection string).")
 
     from . import (alert_rules, alerts, auth, canary, certificates, db, formatting, heartbeat, history,  # noqa: F401
-                   incidents,
+                   incidents, maintenance, status,
                    pulse_words, rollups, rules, scheduler, seed, tick, worker)
     from .views import alerts as alert_views
-    from .views import crew, dashboard, demo, monitors, numbers, settings
+    from .views import crew, dashboard, demo, monitors, numbers, settings, status_pages
     from .views import incidents as incident_views
 
     db.init_app(app)
@@ -145,9 +145,11 @@ def create_app(test_config=None):
     certificates.init_app(app)
     heartbeat.init_app(app)
     alert_rules.init_app(app)
+    maintenance.init_app(app)
+    status_pages.init_app(app)
     # auth comes first: its before_request (load_user) must run before the others'.
     for blueprint in (auth.bp, dashboard.bp, monitors.bp, incident_views.bp, alert_views.bp, crew.bp, settings.bp, demo.bp,
-                      tick.bp, heartbeat.bp):
+                      tick.bp, heartbeat.bp, status_pages.bp, status_pages.public):
         app.register_blueprint(blueprint)
 
     from .dates import utcnow

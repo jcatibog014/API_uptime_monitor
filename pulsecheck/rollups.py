@@ -61,7 +61,8 @@ def recompute_hour(s, hour, workspace_id=None):
     if not ids:
         return 0
     good = Check.ok.is_(True)
-    in_hour = (Check.monitor_id.in_(ids), Check.scheduled_at >= hour, Check.scheduled_at < end)
+    in_hour = (Check.monitor_id.in_(ids), Check.scheduled_at >= hour, Check.scheduled_at < end,
+               Check.resting.is_(False))  # maintenance checks are only counted as resting (below)
     totals = s.execute(select(
         Check.monitor_id, func.count(),
         func.sum(case((good, 1), else_=0)),
@@ -79,6 +80,13 @@ def recompute_hour(s, hour, workspace_id=None):
     for monitor_id, n, count in s.execute(select(Check.monitor_id, bucket, func.count()).where(
             *in_hour, good, Check.total_ms.is_not(None)).group_by(Check.monitor_id, bucket)).all():
         setattr(rows[monitor_id], f"b{n}", count)
+    for monitor_id, resting in s.execute(select(Check.monitor_id, func.count()).where(
+            Check.monitor_id.in_(ids), Check.scheduled_at >= hour, Check.scheduled_at < end,
+            Check.resting.is_(True)).group_by(Check.monitor_id)).all():
+        if monitor_id not in rows:
+            rows[monitor_id] = Rollup(monitor_id=monitor_id, period="hour", start=hour, checks=0, ok=0, slow=0,
+                                      our_side=0, sum_ms=0.0)
+        rows[monitor_id].resting = resting
     for monitor_id, slots in s.execute(select(Gap.monitor_id, func.sum(Gap.slots)).where(
             Gap.monitor_id.in_(ids), Gap.start >= hour, Gap.start < end).group_by(Gap.monitor_id)).all():
         if monitor_id not in rows:
@@ -100,11 +108,12 @@ def recompute_day(s, workspace_id, day, following):
         return 0
     written = 0
     for monitor_id, stats in rollup_stats(s, ids, "hour", day, following).items():
-        if not stats.checks and not stats.missed:
+        if not stats.checks and not stats.missed and not stats.resting:
             continue  # nothing under it: keep any row it has (see recompute_hour)
         s.execute(delete(Rollup).where(Rollup.period == "day", Rollup.start == day, Rollup.monitor_id == monitor_id))
         row = Rollup(monitor_id=monitor_id, period="day", start=day, checks=stats.checks, ok=stats.ok,
-                     slow=stats.slow, our_side=stats.our_side, missed=stats.missed, sum_ms=stats.sum_ms,
+                     slow=stats.slow, our_side=stats.our_side, resting=stats.resting, missed=stats.missed,
+                     sum_ms=stats.sum_ms,
                      min_ms=stats.min_ms, max_ms=stats.max_ms)
         for n in range(BUCKETS):
             setattr(row, f"b{n}", stats.buckets[n])

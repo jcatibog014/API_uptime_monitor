@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, csrf, empty %}
+{% from "_icons.html" import icon %}
+{% block title %}Status Pages - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {% call page_head('Status Pages') %}
+    {% if pages and room > 0 %}
+      <form method="post" action="{{ url_for('status_pages.create') }}">{{ csrf() }}<button class="button" type="submit">{{ icon('plus') }} New status page</button></form>
+    {% endif %}
+  {% endcall %}
+  {% include "_status_tabs.html" %}
+  {% if pages %}
+    <div class="channel-list">
+      {% for page in pages %}
+        <article class="card">
+          <div class="channel-head"><h3>{{ page.name }}</h3></div>
+          <p class="address">{{ config.BASE_URL }}/status/{{ page.slug }}</p>
+          <p class="muted small top-gap-small">{{ plural(page.entries|length, 'monitor') }} on it</p>
+          <div class="form-actions start top-gap">
+            <a class="button button-small" href="{{ url_for('public.show', slug=page.slug) }}">{{ icon('eye', 16) }} Open the page</a>
+            <a class="button button-quiet button-small" href="{{ url_for('status_pages.edit', page_id=page.id) }}">{{ icon('pencil', 16) }} Change</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    {% call empty('No Status Pages Yet', 'A status page is a public page (no login) that shows the people who use your services whether they work, with your notes during an incident.') %}
+      <form method="post" action="{{ url_for('status_pages.create') }}">{{ csrf() }}<button class="button" type="submit">{{ icon('plus') }} New status page</button></form>
+    {% endcall %}
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,28 @@
+<section class="card top-gap-bottom" id="notes">
+  <div class="card-head"><h2>Notes for Status Pages</h2></div>
+  {% if notes %}
+    <ol class="timeline">
+      {% for note in notes %}
+        <li><span class="timeline-time">{{ note.created_at|check_time }} · {{ note_statuses[note.status] }} · {{ note.author }}</span> {{ note.message }}</li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p class="muted">No notes yet. Tell the people who use the service what is happening: they see it on your status pages.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('status_pages.add_update', incident_id=incident.id) }}" class="stack top-gap">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-row">
+      <label class="field note-stage">
+        <span class="field-label">Stage</span>
+        <select name="status">
+          {% for key, label in note_statuses.items() %}<option value="{{ key }}"{% if (not notes and key == 'investigating') or (notes and key == 'identified' and notes[0].status == 'investigating') %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="field note-text">
+        <span class="field-label">Note</span>
+        <input type="text" name="message" maxlength="1000" required placeholder="We're looking into it.">
+      </label>
+      <button class="button" type="submit">Add note</button>
+    </div>
+  </form>
+</section>

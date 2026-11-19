@@ -8,7 +8,9 @@ Where the numbers come from:
 
 Uptime = good checks / counted checks. "Counted" leaves out checks that
 failed on OUR side (canary.py) and, of course, slots nobody checked (gaps):
-neither says anything about the service. So 99.9% means "of the times we
+neither says anything about the service. Checks made during a maintenance
+window are only counted as "resting" (maintenance.py): planned work is not
+downtime. So 99.9% means "of the times we
 really looked, it answered right 999 times in 1,000".
 
 Every function takes the time window as arguments (never the clock), so tests
@@ -37,6 +39,7 @@ class Stats:
     ok: int = 0
     slow: int = 0
     our_side: int = 0
+    resting: int = 0
     missed: int = 0
     sum_ms: float = 0.0
     min_ms: float | None = None
@@ -66,6 +69,7 @@ class Stats:
         self.ok += other.ok
         self.slow += other.slow
         self.our_side += other.our_side
+        self.resting += other.resting
         self.missed += other.missed
         self.sum_ms += other.sum_ms
         mins = [value for value in (self.min_ms, other.min_ms) if value is not None]
@@ -127,11 +131,14 @@ def raw_stats(s, monitor_ids, start, end, keep_values=True):
     found = {monitor_id: Stats(values=[] if keep_values else None) for monitor_id in monitor_ids}
     if not monitor_ids:
         return found
-    rows = s.execute(select(Check.monitor_id, Check.ok, Check.slow, Check.our_side, Check.total_ms)
+    rows = s.execute(select(Check.monitor_id, Check.ok, Check.slow, Check.our_side, Check.total_ms, Check.resting)
                      .where(Check.monitor_id.in_(monitor_ids), Check.scheduled_at >= start,
                             Check.scheduled_at < end)).all()
-    for monitor_id, ok, slow, our_side, total_ms in rows:
+    for monitor_id, ok, slow, our_side, total_ms, resting in rows:
         stats = found[monitor_id]
+        if resting:
+            stats.resting += 1  # planned maintenance: not a check of the service's health
+            continue
         stats.checks += 1
         stats.our_side += bool(our_side)
         if ok:
@@ -154,7 +161,8 @@ def raw_stats(s, monitor_ids, start, end, keep_values=True):
 # ---------- Rollups ----------
 
 def from_row(row):
-    return Stats(checks=row.checks, ok=row.ok, slow=row.slow, our_side=row.our_side, missed=row.missed,
+    return Stats(checks=row.checks, ok=row.ok, slow=row.slow, our_side=row.our_side, resting=row.resting,
+                 missed=row.missed,
                  sum_ms=row.sum_ms or 0.0, min_ms=row.min_ms, max_ms=row.max_ms, buckets=row.histogram())
 
 
@@ -163,7 +171,8 @@ def rollup_stats(s, monitor_ids, period, start, end):
     found = {monitor_id: Stats() for monitor_id in monitor_ids}
     if not monitor_ids:
         return found
-    columns = [func.sum(getattr(Rollup, name)) for name in ("checks", "ok", "slow", "our_side", "missed", "sum_ms")]
+    columns = [func.sum(getattr(Rollup, name)) for name in ("checks", "ok", "slow", "our_side", "missed", "sum_ms",
+                                                             "resting")]
     columns += [func.min(Rollup.min_ms), func.max(Rollup.max_ms)]
     columns += [func.sum(getattr(Rollup, f"b{n}")) for n in range(BUCKETS)]
     rows = s.execute(select(Rollup.monitor_id, *columns).where(
@@ -171,10 +180,11 @@ def rollup_stats(s, monitor_ids, period, start, end):
         .group_by(Rollup.monitor_id)).all()
     for row in rows:
         values = list(row[1:])
-        checks, ok, slow, our_side, missed, sum_ms, min_ms, max_ms = values[:8]
+        checks, ok, slow, our_side, missed, sum_ms, resting, min_ms, max_ms = values[:9]
         found[row[0]] = Stats(checks=int(checks or 0), ok=int(ok or 0), slow=int(slow or 0),
-                              our_side=int(our_side or 0), missed=int(missed or 0), sum_ms=float(sum_ms or 0),
-                              min_ms=min_ms, max_ms=max_ms, buckets=[int(value or 0) for value in values[8:]])
+                              our_side=int(our_side or 0), resting=int(resting or 0), missed=int(missed or 0),
+                              sum_ms=float(sum_ms or 0), min_ms=min_ms, max_ms=max_ms,
+                              buckets=[int(value or 0) for value in values[9:]])
     return found
 
 

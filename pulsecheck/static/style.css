@@ -493,6 +493,31 @@ tbody tr:hover { background: var(--row-hover); }
 .public-logo { font-size: 1.3rem; }
 .public-card { width: min(100%, 30rem); }
 
+/* ---------- Status pages (public), maintenance, incident notes ---------- */
+
+.status-public { max-width: 52rem; margin: 0 auto; padding: 2.5rem clamp(1rem, 4vw, 2rem) 3rem; display: grid; gap: 1.1rem; }
+.status-top { display: grid; gap: .5rem; }
+.status-overall { display: flex; align-items: center; gap: .6rem; margin-top: .6rem; padding: .9rem 1.1rem; border-radius: var(--radius); font: 700 1.1rem/1.3 var(--font-display); background: var(--pulse-quiet-bg); color: var(--pulse-quiet-ink); }
+.status-overall .pulse { padding: 0; background: none; }
+.status-overall.tone-steady { background: var(--pulse-steady-bg); color: var(--pulse-steady-ink); }
+.status-overall.tone-weak { background: var(--pulse-weak-bg); color: var(--pulse-weak-ink); }
+.status-overall.tone-flat { background: var(--pulse-flat-bg); color: var(--pulse-flat-ink); }
+.status-overall.tone-rest { background: var(--pulse-rest-bg); color: var(--pulse-rest-ink); }
+.status-card { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 1.1rem 1.3rem; box-shadow: var(--shadow); }
+.status-card h2 { font-size: 1.05rem; }
+.status-incident { border-left: 4px solid var(--status-critical); }
+.status-window { border-left: 4px solid var(--pulse-rest-lamp); }
+.status-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; }
+.status-row-head { display: flex; align-items: center; gap: .4rem 1rem; flex-wrap: wrap; margin-bottom: .45rem; }
+.status-row-head h2 { flex: 1 1 auto; }
+.status-uptime { font: 600 .82rem var(--font-mono); color: var(--muted); }
+.status-foot { text-align: center; color: var(--muted); font-size: .85rem; }
+.check-grid { display: grid; gap: .4rem 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); }
+.number-box { max-width: 5rem; text-align: right; }
+.note-stage { flex: 0 1 11rem !important; }
+.note-text { flex: 3 1 18rem !important; }
+.top-gap-bottom { margin: 1.2rem 0; }
+
 /* ---------- Toasts ---------- */
 
 .toasts { position: fixed; right: 1rem; bottom: 1rem; z-index: 60; display: grid; gap: .6rem; width: min(26rem, calc(100vw - 2rem)); }

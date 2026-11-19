@@ -156,6 +156,8 @@ class Check(Base):
     our_side: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     # Made by the Check now button, not the schedule.
     manual: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Made during a maintenance window (stage 8): shown, but not counted in uptime.
+    resting: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     error_kind: Mapped[str | None] = mapped_column(String(20))
     message: Mapped[str] = mapped_column(String(300), default="", server_default="")
     status_code: Mapped[int | None] = mapped_column(Integer)
@@ -305,6 +307,7 @@ class Rollup(Base):
     ok: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     slow: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     our_side: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    resting: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # in a maintenance window
     missed: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # skipped slots (gaps)
     sum_ms: Mapped[float] = mapped_column(Float, default=0, server_default="0")  # of good checks
     min_ms: Mapped[float | None] = mapped_column(Float)
@@ -405,3 +408,68 @@ class MonitorChannel(Base):
     monitor_id: Mapped[int] = mapped_column(ForeignKey("monitors.id", ondelete="CASCADE"), primary_key=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("channels.id", ondelete="CASCADE"), primary_key=True, index=True)
     level: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+
+
+class IncidentUpdate(Base):
+    """A note on an incident for the people affected: Investigating, Identified, Monitoring,
+    Resolved. They show on the incident page and on public status pages."""
+    __tablename__ = "incident_updates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    incident_id: Mapped[int] = mapped_column(ForeignKey("incidents.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(14))  # investigating / identified / monitoring / resolved
+    message: Mapped[str] = mapped_column(Text)
+    author: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class StatusPage(Base):
+    """A public page (/status/<slug>, no login) that shows chosen monitors to the people who use them."""
+    __tablename__ = "status_pages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    slug: Mapped[str] = mapped_column(String(60), unique=True)
+    intro: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    entries: Mapped[list["StatusPageMonitor"]] = relationship(
+        back_populates="page", cascade="all, delete-orphan", order_by="StatusPageMonitor.position")
+
+
+class StatusPageMonitor(Base):
+    """A monitor on a status page, in order, maybe with a friendlier name ("Checkout" for "Payments API")."""
+    __tablename__ = "status_page_monitors"
+
+    status_page_id: Mapped[int] = mapped_column(ForeignKey("status_pages.id", ondelete="CASCADE"), primary_key=True)
+    monitor_id: Mapped[int] = mapped_column(ForeignKey("monitors.id", ondelete="CASCADE"), primary_key=True, index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    label: Mapped[str] = mapped_column(String(80), default="", server_default="")
+
+    page: Mapped[StatusPage] = relationship(back_populates="entries")
+    monitor: Mapped[Monitor] = relationship()
+
+
+class Maintenance(Base):
+    """A planned window (maintenance.py): its monitors are still checked, but they rest: no
+    incidents, no alerts, and their checks aren't counted in uptime."""
+    __tablename__ = "maintenance"
+    __table_args__ = (Index("ix_maintenance_workspace_id_ends_at", "workspace_id", "ends_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(120))
+    note: Mapped[str] = mapped_column(String(500), default="", server_default="")
+    starts_at: Mapped[datetime] = mapped_column(DateTime)
+    ends_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    monitors: Mapped[list[Monitor]] = relationship(secondary="maintenance_monitors", order_by="Monitor.name")
+
+
+class MaintenanceMonitor(Base):
+    __tablename__ = "maintenance_monitors"
+
+    maintenance_id: Mapped[int] = mapped_column(ForeignKey("maintenance.id", ondelete="CASCADE"), primary_key=True)
+    monitor_id: Mapped[int] = mapped_column(ForeignKey("monitors.id", ondelete="CASCADE"), primary_key=True, index=True)

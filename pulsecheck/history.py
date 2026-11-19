@@ -35,7 +35,8 @@ def _row(monitor_id, period, start, checks, failures, times):
     """A Rollup from a count of checks, how many failed, and good-check response times
     (all of them, or a sample that stands for the whole day)."""
     ok = max(0, checks - failures)
-    row = Rollup(monitor_id=monitor_id, period=period, start=start, checks=checks, ok=ok, slow=0, our_side=0, missed=0)
+    row = Rollup(monitor_id=monitor_id, period=period, start=start, checks=checks, ok=ok, slow=0, our_side=0, missed=0,
+                 resting=0)
     if times and ok:
         scale = ok / len(times)
         row.sum_ms = sum(times) * scale
@@ -144,11 +145,11 @@ def build(s, workspace, by_service, start, now):
 
 def _sum_hours(monitor_id, day, rows):
     total = Rollup(monitor_id=monitor_id, period="day", start=day, checks=0, ok=0, slow=0, our_side=0, missed=0,
-                   sum_ms=0.0)
+                   resting=0, sum_ms=0.0)
     for n in range(BUCKETS):
         setattr(total, f"b{n}", 0)
     for row in rows:
-        for name in ("checks", "ok", "slow", "our_side", "missed", "sum_ms"):
+        for name in ("checks", "ok", "slow", "our_side", "missed", "resting", "sum_ms"):
             setattr(total, name, getattr(total, name) + (getattr(row, name) or 0))
         for n in range(BUCKETS):
             setattr(total, f"b{n}", getattr(total, f"b{n}") + getattr(row, f"b{n}"))

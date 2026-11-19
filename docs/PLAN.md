@@ -132,7 +132,7 @@ Every row has `workspace_id`, and every foreign key has a leading index.
 - [x] Stage 5: alerts
 - [x] Stage 6: smarter checks
 - [x] Stage 7: alert rules
-- [ ] Stage 8: status page and incidents
+- [x] Stage 8: status page and incidents
 - [ ] Stage 9: Insights and deploy
 
 ## Where the Build Differs
@@ -144,3 +144,4 @@ Every row has `workspace_id`, and every foreign key has a leading index.
 - Stage 5: the breaker opens after 5 failures in a row (the plan said "many"). Webhook addresses must be Discord's or Slack's own, so a channel can't be used to reach a private network. Acknowledge is a page with a button, not a link that acts on a visit (mail apps and chat previews open links by themselves).
 - Stage 6: certificate warnings also go out at 1 day. A heartbeat's missed check confirms at once (1 failure, 1 good ping to recover). Speed: the demo's history samples 6 answers an hour and 24 a day, the practice maths is cached, and a replay round takes every monitor due in the next minute (never past the next queued job), so the tests take under two minutes again.
 - Stage 7: flapping is 3 incidents in 30 minutes (the plan said 5 state changes: an incident is 2 changes, and Irregular flickers would count too). A flapper that settles DOWN sends its held down alert instead of "settled".
+- Stage 8: maintenance is a tab of Status Pages, not its own menu entry. The public page uses plain words (Up, Slow, Down, Maintenance) and shows a confirmed incident only, never an Irregular blip.

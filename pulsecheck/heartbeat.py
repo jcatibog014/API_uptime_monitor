@@ -104,7 +104,7 @@ def demo_heartbeat(s, workspace, by_service, start, now):
         midnight = local_midnight(moment, zone_name)
         ok = back != DEMO_MISSED
         row = Rollup(monitor_id=monitor.id, period="day", start=midnight, checks=1, ok=int(ok), slow=0, our_side=0,
-                     missed=0, sum_ms=0.0, **{f"b{n}": 0 for n in range(BUCKETS)})
+                     missed=0, resting=0, sum_ms=0.0, **{f"b{n}": 0 for n in range(BUCKETS)})
         s.add(row)
         if back > 14:
             continue  # raw checks are kept for 14 days
