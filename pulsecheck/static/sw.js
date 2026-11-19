@@ -5,7 +5,7 @@
 // without a connection a small "You're offline" page shows instead.
 "use strict";
 
-const CACHE = "pulsecheck-v1"; // change the number when these files change
+const CACHE = "pulsecheck-v2"; // change the number when these files change
 const FILES = [
   "/static/style.css",
   "/static/app.js",

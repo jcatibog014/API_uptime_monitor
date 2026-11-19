@@ -208,7 +208,7 @@ html:not(.js) .js-only { display: none !important; }
 .sidebar-screen { border-radius: 10px; padding: .85rem .9rem .55rem; box-shadow: inset 0 0 0 1px var(--bezel-edge), inset 0 2px 12px rgb(0 0 0 / .6); }
 .sidebar-screen .trace { margin-top: .5rem; height: 1.6rem; }
 .logo { display: inline-flex; align-items: center; gap: .6rem; font: 700 1.2rem/1.1 var(--font-display); color: inherit; text-decoration: none; white-space: nowrap; }
-.logo-mark { flex: 0 0 auto; border-radius: 22%; }
+.logo-mark { flex: 0 0 auto; }
 .demo-tag { font: 700 .7rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; background: #fbbf24; color: #2a1a00; padding: .28rem .45rem; border-radius: 4px; }
 .side-links { list-style: none; margin: 1.1rem 0 0; padding: 0; display: grid; gap: .15rem; }
 .side-links a { display: flex; align-items: center; gap: .7rem; min-height: 2.5rem; padding: .35rem .75rem; border-radius: var(--radius); font-weight: 600; color: var(--bezel-ink); }
