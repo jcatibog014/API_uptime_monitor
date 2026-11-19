@@ -95,6 +95,7 @@ The Crew page shows the workers, how late the checks are, and the jobs that gave
 ![A monitor in dark mode](docs/screenshots/monitor-dark.png)
 
 <p>
+  <img src="docs/screenshots/phone-login.png" alt="The login page on a phone" width="300">
   <img src="docs/screenshots/phone-dashboard.png" alt="The Dashboard on a phone" width="300">
   <img src="docs/screenshots/phone-status-page.png" alt="A status page on a phone" width="300">
 </p>
