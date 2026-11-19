@@ -5,3 +5,5 @@ psycopg[binary]>=3.2,<4  # talks to PostgreSQL (Supabase) on the live site; SQLi
 tzdata>=2025.1  # time zone data (Windows doesn't have it built in)
 gunicorn>=23  # the web server on Render (Linux only; locally use "flask run")
 pytest>=8
+cryptography>=44  # encrypts webhook addresses and bot tokens (Fernet)
+pywebpush>=2,<3  # phone alerts (web push with VAPID keys); it brings py-vapid

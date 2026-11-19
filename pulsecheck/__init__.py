@@ -83,6 +83,16 @@ def create_app(test_config=None):
         # always up. CANARY_URL="" turns the outside check off.
         SELF_CHECK=env_flag("SELF_CHECK", True),
         CANARY_URL=os.environ.get("CANARY_URL", "https://www.gstatic.com/generate_204"),
+        # Keeps channel secrets (webhook addresses, bot tokens) encrypted (crypto.py).
+        ENCRYPTION_KEY=os.environ.get("ENCRYPTION_KEY"),
+        # Email alerts go through Brevo's HTTP API (Render's free plan blocks SMTP).
+        # BREVO_SENDER is an address Brevo has checked.
+        BREVO_API_KEY=os.environ.get("BREVO_API_KEY"),
+        BREVO_SENDER=os.environ.get("BREVO_SENDER"),
+        # Phone alerts (web push): flask --app pulsecheck make-vapid-keys makes the two keys.
+        VAPID_PUBLIC_KEY=os.environ.get("VAPID_PUBLIC_KEY", ""),
+        VAPID_PRIVATE_KEY=os.environ.get("VAPID_PRIVATE_KEY", ""),
+        VAPID_SUBJECT=os.environ.get("VAPID_SUBJECT", ""),
     )
     if test_config:
         app.config.update(test_config)
@@ -101,11 +111,14 @@ def create_app(test_config=None):
             raise RuntimeError("ALLOW_PRIVATE_TARGETS is for your own PC only. Remove it on Render.")
     if on_render and app.config["SECRET_KEY"] == DEV_SECRET_KEY:
         raise RuntimeError("Set the SECRET_KEY environment variable on Render.")
+    if on_render and not app.config["ENCRYPTION_KEY"]:
+        raise RuntimeError("Set the ENCRYPTION_KEY environment variable on Render.")
     if on_render and not app.config["DATABASE_URL"]:
         # Without it we'd use a SQLite file, and Render forgets files on every restart.
         raise RuntimeError("Set the DATABASE_URL environment variable on Render (Supabase's connection string).")
 
-    from . import auth, canary, db, formatting, history, incidents, pulse_words, rollups, scheduler, seed, tick, worker  # noqa: F401
+    from . import alerts, auth, canary, db, formatting, history, incidents, pulse_words, rollups, scheduler, seed, tick, worker  # noqa: F401
+    from .views import alerts as alert_views
     from .views import crew, dashboard, demo, monitors, numbers, settings
     from .views import incidents as incident_views
 
@@ -125,16 +138,28 @@ def create_app(test_config=None):
     rollups.init_app(app)
     history.init_app(app)
     numbers.init_app(app)
+    alerts.init_app(app)
+    alert_views.init_app(app)
     # auth comes first: its before_request (load_user) must run before the others'.
-    for blueprint in (auth.bp, dashboard.bp, monitors.bp, incident_views.bp, crew.bp, settings.bp, demo.bp, tick.bp):
+    for blueprint in (auth.bp, dashboard.bp, monitors.bp, incident_views.bp, alert_views.bp, crew.bp, settings.bp, demo.bp,
+                      tick.bp):
         app.register_blueprint(blueprint)
 
-    app.jinja_env.globals.update(APP_NAME=APP_NAME, TAGLINE=TAGLINE,
+    from .dates import utcnow
+    app.jinja_env.globals.update(APP_NAME=APP_NAME, TAGLINE=TAGLINE, now=utcnow,
                                  has_page=lambda endpoint: endpoint in app.view_functions)
 
     @app.get("/healthz")
     def healthz():
         return "ok"
+
+    @app.get("/sw.js")
+    def service_worker():
+        # From the top of the site, not /static/: a service worker only looks after
+        # the pages below the address it came from.
+        response = app.send_static_file("sw.js")
+        response.headers["Cache-Control"] = "no-cache"  # always check for a new version
+        return response
 
     @app.get("/favicon.ico")
     def favicon():

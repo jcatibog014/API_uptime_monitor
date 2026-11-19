@@ -462,6 +462,35 @@ tbody tr:hover { background: var(--row-hover); }
 .spark circle { fill: var(--chart-1); stroke: var(--surface); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .spark.is-failed circle { fill: var(--status-critical); }
 
+/* ---------- Alerts: channels, the Practice Inbox, the Acknowledge page ---------- */
+
+.channel-list { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+.channel-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .35rem; }
+.channel-head h3 { flex: 1 1 auto; font-size: 1.05rem; }
+.channel-kind { font: 700 .7rem/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--rule); border-radius: 4px; padding: .25rem .4rem; }
+.add-kind h3 { margin-bottom: .2rem; }
+
+.inbox-note { margin-bottom: 1rem; }
+.inbox { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); align-items: start; }
+.message { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: .9rem 1.05rem 1rem; box-shadow: var(--shadow); }
+.message-head { display: flex; justify-content: space-between; gap: .6rem; flex-wrap: wrap; font: 600 .75rem/1.4 var(--font-mono); color: var(--muted); margin-bottom: .45rem; }
+.message-from { font-size: .82rem; color: var(--muted); }
+.message-title { font-size: 1rem; margin: .1rem 0 .35rem; }
+.message-body { font-size: .9rem; display: grid; gap: .2rem; overflow-wrap: anywhere; }
+.message-link { display: inline-block; margin-top: .55rem; font-size: .88rem; font-weight: 600; }
+/* Each service's own look, lightly: a coloured edge for Discord, a bubble for Telegram, a
+   notification card for a phone. The edge is red for down and green for up, like Discord's. */
+.look-discord { border-left: 4px solid var(--pulse-quiet-lamp); }
+.look-discord.is-down { border-left-color: var(--status-critical); }
+.look-discord.is-up { border-left-color: var(--status-good); }
+.look-telegram { border-radius: 16px 16px 16px 4px; background: color-mix(in srgb, var(--chart-1) 8%, var(--surface)); }
+.look-push { border-radius: 18px; box-shadow: 0 6px 20px rgb(0 0 0 / .14); }
+.look-email .message-title { font-size: 1.05rem; }
+
+.public-page { min-height: 100vh; display: grid; place-items: center; align-content: center; gap: 1.2rem; padding: 2rem 1rem; }
+.public-logo { font-size: 1.3rem; }
+.public-card { width: min(100%, 30rem); }
+
 /* ---------- Toasts ---------- */
 
 .toasts { position: fixed; right: 1rem; bottom: 1rem; z-index: 60; display: grid; gap: .6rem; width: min(26rem, calc(100vw - 2rem)); }

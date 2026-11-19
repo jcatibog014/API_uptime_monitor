@@ -1,0 +1,1 @@
+<dt>On it</dt><dd>{% if incident.acked_at %}{{ incident.acked_by }}, {{ incident.acked_at|check_time }}{% else %}Nobody yet{% endif %}</dd>

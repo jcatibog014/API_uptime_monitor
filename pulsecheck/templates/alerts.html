@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, csrf, empty, pulse %}
+{% from "_icons.html" import icon %}
+{% block title %}Alerts - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {{ page_head('Alerts') }}
+  {% include "_alert_tabs.html" %}
+
+  <section class="section">
+    <div class="card-head"><h2>Channels</h2></div>
+    {% if channels %}
+      <div class="channel-list">
+        {% for channel in channels %}
+          <article class="card channel" id="channel-{{ channel.id }}">
+            <div class="channel-head">
+              <span class="channel-kind kind-{{ channel.kind }}">{{ channel_kind(channel.kind) }}</span>
+              <h3>{{ channel.name }}</h3>
+              {% if not channel.enabled %}{{ pulse(pulse_state('paused')) }}
+              {% elif channel.paused_until and channel.paused_until > now() %}<span class="pulse pulse-weak" title="After {{ channel.fail_streak }} failures in a row, it rests before trying again.">Resting<span class="visually-hidden">: after failures in a row, it rests before trying again</span></span>
+              {% endif %}
+            </div>
+            <p class="muted small">
+              {% if channel.kind == 'email' %}To {{ channel.settings.address }}
+              {% elif channel.kind == 'telegram' %}To {{ channel.settings.chat_name or 'the chosen chat' }}
+              {% elif channel.kind == 'practice' %}Shown like {{ looks.get(channel.settings.looks_like, 'Email') }} in the Practice Inbox
+              {% elif channel.kind == 'push' %}To {{ plural(devices|length, 'device') }} that turned alerts on
+              {% else %}Through a webhook (kept encrypted){% endif %}
+              {% if channel.last_sent_at %} · last alert {{ channel.last_sent_at|ago }}{% endif %}
+            </p>
+            {% if channel.last_error %}<p class="field-error small">{{ channel.last_error }}</p>{% endif %}
+            <div class="form-actions start top-gap">
+              <form method="post" action="{{ url_for('alerts.test', channel_id=channel.id) }}">{{ csrf() }}<button class="button button-small" type="submit">{{ icon('send', 16) }} Send a test</button></form>
+              <form method="post" action="{{ url_for('alerts.toggle', channel_id=channel.id) }}">{{ csrf() }}<button class="button button-quiet button-small" type="submit">{{ 'Resume' if not channel.enabled else 'Pause' }}</button></form>
+              <form method="post" action="{{ url_for('alerts.remove', channel_id=channel.id) }}" data-confirm="Delete {{ channel.name }}? Its alerts stop.">{{ csrf() }}<button class="button button-danger button-small" type="submit">Delete</button></form>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      {{ empty('No Channels Yet', 'Add a channel below, and every monitor that goes down or comes back sends an alert there.') }}
+    {% endif %}
+  </section>
+
+  {% if room > 0 %}
+  <section class="section" id="add">
+    <div class="card-head"><h2>Add a Channel</h2></div>
+    <div class="grid grid-3">
+      {% for kind in kinds %}
+        {% set problem = ready(kind) %}
+        <div class="card add-kind">
+          <h3>{{ kind_words[kind][0] }}</h3>
+          <p class="muted small">{{ kind_words[kind][1] }}</p>
+          {% if problem %}
+            <p class="small field-note top-gap">{{ problem }}</p>
+          {% else %}
+            <a class="button button-quiet button-small top-gap" href="{{ url_for('alerts.new', kind=kind) }}">{{ icon('plus', 16) }} {{ {'email': 'Add email', 'discord': 'Add Discord', 'slack': 'Add Slack', 'telegram': 'Add Telegram', 'push': 'Add phone alerts', 'practice': 'Add a practice channel'}[kind] }}</a>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    {% if g.workspace.is_demo %}<p class="muted small top-gap">The demo's alerts go to the Practice Inbox, never a real service.</p>{% endif %}
+  </section>
+  {% endif %}
+
+  {% if not g.workspace.is_demo and config.VAPID_PUBLIC_KEY %}
+  <section class="section" id="devices">
+    <div class="card-head"><h2>This Device</h2></div>
+    <div class="card">
+      <p class="muted">Turn on alerts here to get them as notifications on this phone or computer (with a Phone Alerts channel). On an iPhone, add Pulse Check to your Home Screen first.</p>
+      <div class="form-actions start top-gap">
+        <button class="button" type="button" data-push-on data-key="{{ config.VAPID_PUBLIC_KEY }}" data-url="{{ url_for('alerts.subscribe') }}" hidden>Turn on alerts on this device</button>
+        <p class="small muted" data-push-note></p>
+      </div>
+      {% if devices %}
+        <ul class="plain-list top-gap">
+          {% for device in devices %}
+            <li class="list-row"><span class="grow small">A device, since {{ device.created_at|nice_date }}</span>
+              <form method="post" action="{{ url_for('alerts.forget_device', device_id=device.id) }}">{{ csrf() }}<button class="button button-quiet button-small" type="submit">Forget</button></form></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+{% endblock %}

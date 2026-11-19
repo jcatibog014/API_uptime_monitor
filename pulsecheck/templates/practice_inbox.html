@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, empty %}
+{% block title %}Practice Inbox - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {{ page_head('Alerts') }}
+  {% include "_alert_tabs.html" %}
+  {% if rows %}
+    <p class="muted small inbox-note">Alerts to practice channels land here, drawn the way each service would show them. Nothing left Pulse Check.</p>
+    <div class="inbox">
+      {% for message in rows %}
+        <article class="message look-{{ message.looks_like }}{% if message.title.endswith(' is down') %} is-down{% elif message.title.endswith(' back up') %} is-up{% endif %}">
+          <header class="message-head">
+            <span class="message-app">{% if message.looks_like == 'email' %}Email{% elif message.looks_like == 'discord' %}Discord{% elif message.looks_like == 'telegram' %}Telegram{% else %}Phone notification{% endif %} · {{ message.channel_name }}</span>
+            <time class="message-time">{{ message.at|check_time }}</time>
+          </header>
+          {% if message.looks_like == 'email' %}<p class="message-from">From Pulse Check</p>{% endif %}
+          <h3 class="message-title">{{ message.title }}</h3>
+          <div class="message-body">
+            {% for line in message.body.splitlines() if line.strip() %}
+              {% if line.startswith('On it? Acknowledge: ') %}<p>On it? <a href="{{ line.split(': ', 1)[1] }}">Acknowledge</a></p>{% else %}<p>{{ line }}</p>{% endif %}
+            {% endfor %}
+          </div>
+          {% if message.link %}<a class="message-link" href="{{ message.link }}">Open in Pulse Check</a>{% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    {{ empty('The Practice Inbox Is Empty', 'Add a Practice Inbox channel and send a test: the alert shows here, drawn like an email, a Discord or Telegram message, or a phone notification.') }}
+  {% endif %}
+{% endblock %}

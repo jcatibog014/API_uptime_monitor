@@ -13,7 +13,7 @@ scan the whole table.
 """
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, false
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, false, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .dates import DEFAULT_ZONE, utcnow
@@ -218,6 +218,9 @@ class Incident(Base):
     cause: Mapped[str | None] = mapped_column(String(20))  # the error_kind of the confirming check
     message: Mapped[str] = mapped_column(String(300), default="", server_default="")
     failed_checks: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Someone said "I'm on it" (the Acknowledge link in an alert, or the button): reminders stop.
+    acked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    acked_by: Mapped[str] = mapped_column(String(80), default="", server_default="")
 
     monitor: Mapped[Monitor] = relationship()
 
@@ -289,3 +292,80 @@ class Rollup(Base):
 
     def histogram(self):
         return [getattr(self, f"b{n}") or 0 for n in range(BUCKETS)]
+
+
+class Channel(Base):
+    """Somewhere alerts go (alerts.py): an email address, a Discord or Slack webhook, a Telegram
+    chat, the phones that turned on alerts, or the Practice Inbox (the demo's, and for trying).
+    Webhook addresses and bot tokens are secrets: they're kept encrypted (crypto.py)."""
+    __tablename__ = "channels"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(10))  # email / discord / slack / telegram / push / practice
+    name: Mapped[str] = mapped_column(String(80))
+    # Not secret: the email address, the Telegram chat's name, how a practice channel looks...
+    settings: Mapped[dict] = mapped_column(JSON, default=dict)
+    secret: Mapped[str] = mapped_column(Text, default="", server_default="")  # encrypted
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    # The breaker: failures in a row, and no sending until paused_until (alerts.py).
+    fail_streak: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    paused_until: Mapped[datetime | None] = mapped_column(DateTime)
+    last_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_error: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Alert(Base):
+    """One alert to one channel: "Payments API is down" to the team's Discord.
+    UNIQUE per incident, channel, event and seq, so the same alert is never made twice
+    (seq numbers the reminders of one incident; stage 7)."""
+    __tablename__ = "alerts"
+    __table_args__ = (UniqueConstraint("incident_id", "channel_id", "event", "seq"),
+                      Index("ix_alerts_workspace_id_created_at", "workspace_id", "created_at"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    channel_id: Mapped[int] = mapped_column(ForeignKey("channels.id", ondelete="CASCADE"), index=True)
+    incident_id: Mapped[int | None] = mapped_column(ForeignKey("incidents.id", ondelete="CASCADE"), index=True)
+    event: Mapped[str] = mapped_column(String(12))  # down / up / test (later: reminder, escalation...)
+    seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    status: Mapped[str] = mapped_column(String(10), default="waiting", server_default="waiting")
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text, default="", server_default="")
+    link: Mapped[str] = mapped_column(String(500), default="", server_default="")
+    tries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_error: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    channel: Mapped[Channel] = relationship()
+
+
+class PracticeMessage(Base):
+    """What a practice channel "received": the Practice Inbox shows each alert the way the real
+    service would (an email, a Discord message, a Telegram message, a phone notification)."""
+    __tablename__ = "practice_messages"
+    __table_args__ = (Index("ix_practice_messages_workspace_id_at", "workspace_id", "at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    alert_id: Mapped[int] = mapped_column(ForeignKey("alerts.id", ondelete="CASCADE"), unique=True)
+    looks_like: Mapped[str] = mapped_column(String(10))  # email / discord / telegram / push
+    channel_name: Mapped[str] = mapped_column(String(80))
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text, default="", server_default="")
+    link: Mapped[str] = mapped_column(String(500), default="", server_default="")
+    at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class PushSubscription(Base):
+    """A browser or phone that turned on alerts (web push). One push channel sends to all of them."""
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    endpoint: Mapped[str] = mapped_column(String(1000), unique=True)
+    p256dh: Mapped[str] = mapped_column(String(200))
+    auth: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

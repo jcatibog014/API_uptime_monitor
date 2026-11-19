@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, csrf, field, select %}
+{% block title %}Add {{ kind_words[kind][0] }} - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {{ page_head('Add ' ~ kind_words[kind][0], back=url_for('alerts.index'), back_label='Alerts') }}
+  <form method="post" class="card form-card stack" novalidate>
+    {{ csrf() }}
+    <p class="muted">{{ kind_words[kind][1] }}</p>
+    {{ field('name', 'Name', form.get('name', ''), errors.name, hint='What you call it, like Team email or #ops', attrs='required maxlength="80" autofocus') }}
+
+    {% if kind == 'email' %}
+      {{ field('address', 'Email address', form.get('address', ''), errors.address, type='email', attrs='required autocomplete="email"') }}
+    {% elif kind == 'discord' %}
+      {{ field('url', 'Webhook address', '', errors.url, type='url', hint='Server Settings, Integrations, Webhooks, Copy Webhook URL',
+               note='Anyone with this address can post in the channel, so it is kept encrypted and never shown again.',
+               attrs='required autocomplete="off" spellcheck="false" placeholder="https://discord.com/api/webhooks/..."') }}
+    {% elif kind == 'slack' %}
+      {{ field('url', 'Webhook address', '', errors.url, type='url', hint='From a Slack app with Incoming Webhooks',
+               note='Kept encrypted and never shown again.',
+               attrs='required autocomplete="off" spellcheck="false" placeholder="https://hooks.slack.com/services/..."') }}
+    {% elif kind == 'telegram' %}
+      {% if chats %}
+        <input type="hidden" name="token" value="{{ form.get('token', '') }}">
+        <fieldset class="stack-small">
+          <legend class="field-label">Send alerts to which chat?</legend>
+          {% for chat_id, chat_name in chats %}
+            <label class="check"><input type="radio" name="chat_id" value="{{ chat_id }}|{{ chat_name }}" required{% if loop.first %} checked{% endif %}> {{ chat_name }}</label>
+          {% endfor %}
+        </fieldset>
+      {% else %}
+        <ol class="notes">
+          <li>In Telegram, talk to @BotFather and send /newbot. It gives you a token.</li>
+          <li>Send your new bot any message (or add it to a group and write there).</li>
+          <li>Paste the token here: Pulse Check finds the chat.</li>
+        </ol>
+        {{ field('token', 'Bot token', '', errors.token, hint='Kept encrypted', attrs='required autocomplete="off" spellcheck="false"') }}
+      {% endif %}
+    {% elif kind == 'push' %}
+      <p class="muted small">After you add it, press "Turn on alerts on this device" on the Alerts page, on each phone or computer that should get them.</p>
+    {% elif kind == 'practice' %}
+      {{ select('looks_like', 'Shown like', looks, form.get('looks_like', 'email'), hint='How the Practice Inbox draws it') }}
+    {% endif %}
+
+    <div class="form-actions">
+      <a class="button button-quiet" href="{{ url_for('alerts.index') }}">Cancel</a>
+      <button class="button" type="submit">{% if kind == 'telegram' and not chats %}Find the chat{% else %}Add channel{% endif %}</button>
+    </div>
+  </form>
+{% endblock %}

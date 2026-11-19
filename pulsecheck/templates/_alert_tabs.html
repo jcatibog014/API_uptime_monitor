@@ -1,0 +1,8 @@
+{% set here = request.endpoint %}
+<nav aria-label="Alerts">
+  <ul class="tabs">
+    <li><a href="{{ url_for('alerts.index') }}"{% if here in ('alerts.index', 'alerts.new') %} aria-current="page"{% endif %}>Channels</a></li>
+    <li><a href="{{ url_for('alerts.sent') }}"{% if here == 'alerts.sent' %} aria-current="page"{% endif %}>Sent</a></li>
+    <li><a href="{{ url_for('alerts.inbox') }}"{% if here == 'alerts.inbox' %} aria-current="page"{% endif %}>Practice Inbox</a></li>
+  </ul>
+</nav>

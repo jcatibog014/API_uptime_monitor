@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, pulse %}
+{% from "_icons.html" import logo %}
+{% block title %}Acknowledge - {{ APP_NAME }}{% endblock %}
+{% block layout %}
+  <main class="public-page" id="main">
+    <a class="logo public-logo" href="{{ url_for('auth.index') }}">{{ logo(40) }} {{ APP_NAME }}</a>
+    <section class="card public-card">
+      <h1>{{ incident.monitor.name }}</h1>
+      <p class="top-gap">{{ pulse(incident_word(incident)) }}</p>
+      <dl class="facts top-gap">
+        <dt>Down since</dt><dd>{{ incident.opened_at|nice_datetime(incident.monitor.workspace.time_zone) }}</dd>
+        <dt>Why</dt><dd>{{ error_label(incident.cause) }}: {{ incident.message }}</dd>
+        {% if incident.resolved_at %}<dt>Back up</dt><dd>{{ incident.resolved_at|nice_datetime(incident.monitor.workspace.time_zone) }}</dd>{% endif %}
+      </dl>
+      {% if incident.acked_at %}
+        <p class="top-gap"><strong>{{ incident.acked_by }}</strong> is on it, since {{ incident.acked_at|nice_datetime(incident.monitor.workspace.time_zone) }}.</p>
+      {% elif incident.is_open %}
+        <form method="post" class="top-gap">
+          {{ csrf() }}
+          <p class="muted small">Tell everyone you're on it. Reminders about this incident stop.</p>
+          <button class="button button-block top-gap" type="submit">I'm on it</button>
+        </form>
+      {% else %}
+        <p class="top-gap muted">It is already back up. Nothing to do.</p>
+      {% endif %}
+    </section>
+  </main>
+{% endblock %}

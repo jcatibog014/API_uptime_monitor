@@ -236,7 +236,38 @@ function setUpReplayWatch() {
   setInterval(check, 2000);
 }
 
+// "Turn on alerts on this device": ask the browser for permission, subscribe it to push with the
+// server's public VAPID key, and send the subscription to the server. Hidden where push can't work.
+function setUpPushButton() {
+  const button = document.querySelector("[data-push-on]");
+  if (!button || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  const note = document.querySelector("[data-push-note]");
+  const say = (text) => { if (note) note.textContent = text; };
+  const key = Uint8Array.from(atob(button.dataset.key.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (button.dataset.key.length % 4)) % 4)), (c) => c.charCodeAt(0));
+  button.hidden = false;
+  button.addEventListener("click", async () => {
+    try {
+      if ((await Notification.requestPermission()) !== "granted") {
+        say("Notifications are blocked for this site. Allow them in the browser's settings.");
+        return;
+      }
+      const worker = await navigator.serviceWorker.ready;
+      const subscription = await worker.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      const csrf = document.querySelector('input[name="csrf_token"]');
+      const response = await fetch(button.dataset.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf ? csrf.value : "" },
+        body: JSON.stringify(subscription),
+      });
+      say(response.ok ? "Alerts are on for this device. Reload to see it in the list." : "That didn't work. Please try again.");
+    } catch (error) {
+      say("This browser couldn't turn on alerts.");
+    }
+  });
+}
+
 // Startup: every part looks for its own elements and does nothing if they aren't on the page.
 const setUps = [setUpToasts, setUpWatchChanges, setUpInstall, setUpTheme, setUpMenu, setUpPopovers,
-  setUpConfirm, setUpAutoSubmit, setUpCopy, setUpReplayWatch];
+  setUpConfirm, setUpAutoSubmit, setUpCopy, setUpReplayWatch, setUpPushButton];
 document.addEventListener("DOMContentLoaded", () => setUps.forEach((setUp) => setUp()));

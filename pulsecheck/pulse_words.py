@@ -49,6 +49,15 @@ INCIDENT = {
     "resolved": Word("Resolved", "It is back up.", "steady"),
 }
 
+# An alert on its way to a channel (alerts.py). Plain words: these are about delivery, not health.
+ALERT = {
+    "waiting": Word("Waiting", "In the queue; it goes out in a moment.", "quiet"),
+    "retrying": Word("Retrying", "The service said no for now. It is tried again after a wait.", "weak"),
+    "sent": Word("Sent", "The service took it.", "steady"),
+    "failed": Word("Failed", "It can't be delivered: fix the channel (the reason is beside it).", "flat"),
+    "skipped": Word("Skipped", "The channel was paused, so it wasn't sent.", "quiet"),
+}
+
 # A member of the crew (worker.py), on the Crew page.
 WORKER = {
     "on": Word("On Duty", "Working: it wrote its heartbeat in the last 2 minutes.", "steady"),
