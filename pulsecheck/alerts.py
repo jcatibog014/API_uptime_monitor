@@ -113,6 +113,14 @@ def raise_monitor_alert(s, monitor, event, seq, now, title, body):
     return [alert for alert in made if alert is not None]
 
 
+def raise_workspace_alert(s, workspace, event, now, title, body):
+    """An alert about the whole workspace (the weekly report), to every enabled channel. The
+    caller makes sure it is raised once (insights.py remembers the last report)."""
+    made = [make(s, channel, event, title, body, site("/insights"), now)
+            for channel in enabled_channels(s, workspace.id)]
+    return [alert for alert in made if alert is not None]
+
+
 def send_test(s, channel, now):
     workspace = s.get(Workspace, channel.workspace_id)
     title, body, link = compose("test", None, None, workspace, now)

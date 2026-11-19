@@ -122,6 +122,7 @@
           {% if monitor.assertions and monitor.assertions.get('json_path') %}<dt>JSON value</dt><dd><code>{{ monitor.assertions.json_path }}</code>{% if monitor.assertions.get('json_value') %} = <code>{{ monitor.assertions.json_value }}</code>{% endif %}</dd>{% endif %}
           {% if monitor.cert_expires_at %}<dt>Certificate</dt><dd>Runs out {{ monitor.cert_expires_at|nice_date }}{% if monitor.cert_issuer %} ({{ monitor.cert_issuer }}){% endif %}</dd>{% endif %}
         {% endif %}
+        <dt>Uptime goal</dt><dd>{{ goal_words(monitor.slo_target) }}</dd>
         <dt>Down after</dt><dd>{{ plural(monitor.confirm_tries, 'failed check') }} in a row</dd>
         <dt>Up again after</dt><dd>{{ plural(monitor.recover_tries, 'good check') }} in a row</dd>
         {% for template_name in monitor_facts|default([]) %}{% include template_name %}{% endfor %}

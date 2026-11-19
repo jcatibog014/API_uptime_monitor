@@ -40,6 +40,19 @@ def save_workspace(s, workspace, form):
 actions["workspace"] = save_workspace
 
 
+def save_report(s, workspace, form):
+    from ..dates import utcnow
+    workspace.weekly_report = form.get("weekly_report") == "1"
+    if workspace.weekly_report:
+        workspace.last_report_at = utcnow()  # this week counts as done: the first one is next Monday
+    return {}, ("The weekly report is on: the first one goes out next Monday at 8 AM." if workspace.weekly_report
+                else "The weekly report is off.")
+
+
+actions["report"] = save_report
+extras.append(lambda s, workspace: {"settings_sections": ["_settings_report.html"]})
+
+
 @bp.route("/settings", methods=["GET", "POST"])
 @login_required
 def page():

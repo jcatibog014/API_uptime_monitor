@@ -33,6 +33,9 @@ class Workspace(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     # True while a new demo's past is being replayed (seed.py): the live crew leaves it alone.
     replaying: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # The weekly report (insights.py): Mondays at 8 AM, the workspace's time, to every channel.
+    weekly_report: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    last_report_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     users: Mapped[list["User"]] = relationship(back_populates="workspace", cascade="all, delete-orphan",
                                                passive_deletes=True)
@@ -125,6 +128,8 @@ class Monitor(Base):
     cert_warned_days: Mapped[int | None] = mapped_column(Integer)
     # Alert rules (stage 7, alert_rules.py): remind every N minutes while down and nobody is on it,
     # escalate to the second set of channels after M minutes; flapping holds alerts back.
+    # Its uptime goal in percent (insights.py): the error budget is what this goal allows to fail.
+    slo_target: Mapped[float] = mapped_column(Float, default=99.9, server_default="99.9")
     remind_every_m: Mapped[int | None] = mapped_column(Integer)
     escalate_after_m: Mapped[int | None] = mapped_column(Integer)
     flapping: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())

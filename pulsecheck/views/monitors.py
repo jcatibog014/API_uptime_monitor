@@ -3,7 +3,8 @@ from flask import Blueprint, abort, current_app, flash, g, redirect, render_temp
 
 from sqlalchemy import func, select
 
-from .. import alert_rules, checking, db, heartbeat, incidents, limits, monitors, practice, probe, scheduler, worker
+from .. import (alert_rules, checking, db, heartbeat, incidents, insights, limits, monitors, practice, probe,
+               scheduler, worker)
 from ..models import Channel, MonitorChannel
 from ..auth import login_required
 from ..dates import utcnow
@@ -30,6 +31,7 @@ def form_page(template, values, errors, monitor=None):
     return render_template(template, values=shown, errors=errors, monitor=monitor, kinds=monitors.KINDS,
                            intervals=monitors.INTERVALS, timeouts=monitors.TIMEOUTS,
                            every=heartbeat.EVERY, graces=heartbeat.GRACE, slow_limits=monitors.SLOW_LIMITS,
+                           goals=[(goal, label) for goal, label in insights.GOALS],
                            services=practice.choices(),
                            methods=[(method, method) for method in probe.METHODS]), 400 if errors else 200
 

@@ -7,7 +7,7 @@ checking.py does.
 from flask import abort, g
 from sqlalchemy import func, select
 
-from . import heartbeat, practice, probe, rules, targets
+from . import heartbeat, insights, practice, probe, rules, targets
 from .models import Monitor
 
 NAME_MAX_LENGTH = 80
@@ -50,7 +50,7 @@ TEXT_MAX = 200  # a rule's words
 def defaults(kind="http"):
     return {"kind": kind, "name": "", "url": "", "host": "", "port": "", "service": "", "method": "GET",
             "expected_statuses": "200-299", "timeout_s": 10, "interval_s": 3600 if kind == "heartbeat" else 60,
-            "grace_s": 300, "slow_ms": "", "sleepy": False, **{key: "" for key in rules.RULE_KEYS}}
+            "grace_s": 300, "slow_ms": "", "sleepy": False, "slo_target": 99.9, **{key: "" for key in rules.RULE_KEYS}}
 
 
 def values_of(monitor):
@@ -59,7 +59,8 @@ def values_of(monitor):
             "service": practice.parse(monitor.url)[0], "method": monitor.method,
             "expected_statuses": monitor.expected_statuses, "timeout_s": monitor.timeout_s,
             "interval_s": monitor.interval_s, "grace_s": monitor.grace_s, "slow_ms": monitor.slow_ms or "",
-            "sleepy": monitor.sleepy, **{key: (monitor.assertions or {}).get(key, "") for key in rules.RULE_KEYS}}
+            "sleepy": monitor.sleepy, "slo_target": monitor.slo_target,
+            **{key: (monitor.assertions or {}).get(key, "") for key in rules.RULE_KEYS}}
 
 
 def _choice(form, name, choices, default):
@@ -79,6 +80,13 @@ def read_form(form, allow_private=False, demo=False, kind=None):
         kind = "http"
     errors = {}
     values = {"kind": kind, "name": " ".join(form.get("name", "").split())}
+    try:
+        values["slo_target"] = float(form.get("slo_target", "99.9"))
+    except ValueError:
+        values["slo_target"] = None
+    if values["slo_target"] not in dict(insights.GOALS):
+        errors["slo_target"] = "Choose a goal from the list."
+        values["slo_target"] = 99.9
     shown = {"service": form.get("service", ""), "host": form.get("host", "").strip(), "port": form.get("port", "").strip()}
     if not values["name"]:
         errors["name"] = "Give the monitor a name, like Payments API."

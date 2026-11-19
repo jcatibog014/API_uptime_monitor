@@ -55,6 +55,8 @@
       </div>
     {% endif %}
 
+    {{ select('slo_target', 'Uptime goal', goals, values.slo_target, errors.slo_target, hint='Its error budget on Insights') }}
+
     {% if kind == 'http' %}
       <details class="fold"{% if values.contains or values.not_contains or values.json_path or values.header or values.method != 'GET' or values.expected_statuses != '200-299' or values.sleepy or errors.json_path or errors.expected_statuses %} open{% endif %}>
         <summary>What a good answer looks like</summary>

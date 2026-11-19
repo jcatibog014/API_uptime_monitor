@@ -1,0 +1,60 @@
+# Render "Blueprint": tells Render how to build and run Pulse Check.
+# Render reads this file when you choose New -> Blueprint and pick this repo.
+# The service name becomes the web address: pulse-check.onrender.com
+# (Render adds a few letters if that name is already taken).
+# Every merge into main deploys the site again by itself.
+#
+# Render's free plan forgets its own files on every restart, so the data lives
+# in Supabase (free PostgreSQL that is always on). The step-by-step guide is
+# docs/DEPLOY.md.
+services:
+  - type: web
+    name: pulse-check
+    runtime: python  # the version comes from the .python-version file
+    # Free: it would sleep after 15 quiet minutes, but Pulse Check checks its own address
+    # every minute (canary.py), which counts as a visitor, so it stays awake. One free
+    # service awake all month uses 730 of the account's 750 free hours.
+    plan: free
+    region: singapore  # close to the Philippines, and to a Supabase project in Singapore
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    # First upgrade-db runs the Alembic migrations (it keeps all data, and does
+    # nothing when the tables are up to date). Then gunicorn serves the app.
+    # ONE process: the crew (4 worker threads that make the checks) lives inside
+    # the web app, because Render's free plan has no separate worker service.
+    # 8 threads for pages. The database pool (db.py) has room for both.
+    startCommand: flask --app pulsecheck upgrade-db && gunicorn "pulsecheck:create_app()" --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 120
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # Signs the login cookie and every link in every alert (Acknowledge). Render makes
+      # a long random one. Never change it later: links in alerts already sent would break.
+      - key: SECRET_KEY
+        generateValue: true
+      # Keeps webhook addresses and bot tokens encrypted. Never change it later either:
+      # saved channels couldn't be read (you would add them again).
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      # The secret the GitHub Actions timer sends to /tasks/tick (copy it into the
+      # repo's TICK_KEY secret). Render makes it.
+      - key: TICK_KEY
+        generateValue: true
+      # The site's own address, like https://pulse-check.onrender.com: for links in
+      # alerts and for the self-check (docs/DEPLOY.md, part 2).
+      - key: BASE_URL
+        sync: false
+      # Supabase's Session pooler connection string (postgresql://...). Render asks for
+      # these when you make the Blueprint; they are never written in this file.
+      - key: DATABASE_URL
+        sync: false
+      # Email alerts through Brevo (docs/DEPLOY.md, part 5). Leave empty for no email.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER
+        sync: false
+      # Phone alerts (docs/DEPLOY.md, part 6): flask --app pulsecheck make-vapid-keys
+      # makes the two keys. Leave empty for no phone alerts.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false

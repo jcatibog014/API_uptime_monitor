@@ -1,0 +1,15 @@
+<section class="card" id="report">
+  <h2>Weekly Report</h2>
+  <p class="muted">Every Monday at 8 AM ({{ g.workspace.time_zone.replace('_', ' ') }}), last week's uptime and incidents go to every channel.</p>
+  <form method="post" class="setting-row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="report">
+    <input type="hidden" name="anchor" value="report">
+    <div>
+      <h3>{{ 'On' if g.workspace.weekly_report else 'Off' }}</h3>
+      <p class="muted small">{{ 'The next one goes out on Monday at 8 AM.' if g.workspace.weekly_report else 'No report is sent.' }}</p>
+    </div>
+    <input type="hidden" name="weekly_report" value="{{ '0' if g.workspace.weekly_report else '1' }}">
+    <button class="button button-quiet" type="submit">{{ 'Turn off' if g.workspace.weekly_report else 'Turn on' }}</button>
+  </form>
+</section>

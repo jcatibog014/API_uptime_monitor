@@ -52,7 +52,8 @@ MONITORS = [
     ("Images CDN", "images-cdn", 300),
 ]
 # Smarter checks (stage 6) on some of them: a speed limit (Weak Pulse), and a rule about the answer.
-EXTRAS = {"search-api": {"slow_ms": 1200},
+EXTRAS = {"search-api": {"slow_ms": 1200, "slo_target": 99.5},
+          "payments-api": {"slo_target": 99.95},
           "booking-api": {"assertions": {"json_path": "status", "json_value": "ok"}},
           "website": {"assertions": {"contains": "ok"}}}
 # More sample data from later stages: function(s, workspace, monitors_by_service, start, now).
