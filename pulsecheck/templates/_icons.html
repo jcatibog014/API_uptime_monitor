@@ -1,10 +1,10 @@
 {# Line icons, drawn here so no icon font or outside file is needed. #}
 
-{# The app's mark: a heartbeat line on a little monitor screen (static/icons/logo.svg, drawn by
-   docs/make_icons.py from docs/logo/pulse-check.svg). A picture file, not drawn inline: its
-   gradients have ids that would clash when the logo shows twice on a page. It is square. #}
+{# The app's mark: the owner's picture of a glowing green heartbeat on a glossy navy tile
+   (static/icons/logo.png, 256 px, drawn by docs/make_icons.py from docs/logo/pulse-check.png).
+   It is square, with its own round corners. #}
 {% macro logo(size=34) %}
-  <img class="logo-mark" src="{{ url_for('static', filename='icons/logo.svg') }}" width="{{ size }}" height="{{ size }}" alt="">
+  <img class="logo-mark" src="{{ url_for('static', filename='icons/logo.png') }}" width="{{ size }}" height="{{ size }}" alt="">
 {% endmacro %}
 
 {% macro icon(name, size=18) %}
