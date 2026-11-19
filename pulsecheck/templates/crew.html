@@ -60,6 +60,28 @@
     {% endif %}
   </section>
 
+  {% if canary_on %}
+  <section class="section" id="self-check">
+    <div class="card-head"><h2>Self-Check</h2></div>
+    <div class="table-wrap">
+      <table class="fit-table">
+        <thead><tr><th>Check</th><th>Now</th><th class="num">Response</th><th>When</th></tr></thead>
+        <tbody>
+          {% for name, label, why in [('self', 'Our own address', 'Keeps the free plan awake'), ('outside', 'An outside address', 'If it fails, failures are our side')] %}
+            {% set row = canary.get(name) %}
+            <tr>
+              <td><strong>{{ label }}</strong><span class="cell-sub muted small">{{ why }}</span></td>
+              <td>{% if row %}{{ pulse(check_word(row)) }}{% else %}{{ pulse(pulse_state('new')) }}{% endif %}</td>
+              <td class="num" data-label="Response">{{ row.total_ms|ms if row else '–' }}</td>
+              <td data-label="When">{{ row.at|ago if row else 'Not yet' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
   <section class="section" id="dead">
     <div class="card-head"><h2>Dead Letters</h2></div>
     {% if dead %}

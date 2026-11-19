@@ -9,24 +9,26 @@ from flask import current_app
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from . import probe
+from . import practice, probe
 from .models import Check
 
-# kind -> function(monitor, app_config) -> probe.Result. Later stages add kinds.
+# kind -> function(monitor, app_config, moment) -> probe.Result. Later stages add kinds.
 PROBERS = {}
 
 
-def http_prober(monitor, config):
+def http_prober(monitor, config, moment):
     return probe.check(monitor.url, method=monitor.method, expected=monitor.expected_statuses,
                        timeout=monitor.timeout_s, allow_private=config["ALLOW_PRIVATE_TARGETS"])
 
 
 PROBERS["http"] = http_prober
+PROBERS["practice"] = practice.prober
 
 
-def probe_monitor(monitor, config=None):
+def probe_monitor(monitor, moment, config=None):
+    """Check a monitor. moment: the slot the check is for (the practice services' answers depend on it)."""
     config = config if config is not None else current_app.config
-    return PROBERS[monitor.kind](monitor, config)
+    return PROBERS[monitor.kind](monitor, config, moment)
 
 
 def record(s, monitor, result, scheduled_at, started_at, manual=False):
@@ -52,7 +54,7 @@ def record(s, monitor, result, scheduled_at, started_at, manual=False):
 
 def run_check(s, monitor, scheduled_at, started_at, manual=False, config=None):
     """Check a monitor now and record it. Returns (check, result)."""
-    result = probe_monitor(monitor, config)
+    result = probe_monitor(monitor, scheduled_at, config)
     return record(s, monitor, result, scheduled_at, started_at, manual), result
 
 

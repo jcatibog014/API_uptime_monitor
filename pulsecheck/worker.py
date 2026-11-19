@@ -74,17 +74,18 @@ def sign_off(s, worker_id, now):
 every_round = []
 
 
-def run_round(s, worker_id, now, rng=random, workspace_id=None):
-    """One round. Returns how many jobs ran."""
+def run_round(s, worker_id, now, rng=random, workspace_id=None, direct=False):
+    """One round. Returns how much work it did (jobs run, and checks made straight away)."""
     s.expire_all()  # read everything fresh: pages change monitors between rounds
     if workspace_id is None:
         queue.reap(s, now)  # leases are real time: only the live crew checks them
     for task in every_round:
         task(s, now, workspace_id)
-    scheduler.run_due(s, now, workspace_id)
+    checked = scheduler.run_due(s, now, workspace_id, direct=direct)
     done = queue.work(s, worker_id, now, JOBS_PER_ROUND, rng, workspace_id)
-    beat(s, worker_id, now, done)
-    return done
+    if not direct:  # a replay is not on duty: no heartbeat every round
+        beat(s, worker_id, now, done)
+    return done + (checked if direct else 0)
 
 
 # Other moments a worker must wake up for: function(s, now, workspace_id) -> datetime or None.
@@ -187,17 +188,18 @@ def run_until_idle(s, worker_id="timer", now_fn=utcnow, max_rounds=500, budget_s
     return total
 
 
-def simulate(s, start, until, worker_id="rehearsal", rng=None, workspace_id=None, on_round=None):
+def simulate(s, start, until, worker_id="rehearsal", rng=None, workspace_id=None, on_round=None, direct=False):
     """Play the schedule and the queue forward in time, jumping from one due moment to the
     next, without waiting for real seconds. Tests use it ("after an hour of checks, ..."),
-    and so does the demo, to replay its past. Returns the moment it stopped at."""
+    and so does the demo, to replay its past (direct=True: checks run straight away instead
+    of as jobs, see scheduler.run_due). Returns the moment it stopped at."""
     rng = rng or random.Random(7)
     register(s, worker_id, "rehearsal", start)
     now = start
     while now <= until:
         if on_round:
             on_round()  # e.g. keep a long job's lease (the demo's replay)
-        if run_round(s, worker_id, now, rng, workspace_id):
+        if run_round(s, worker_id, now, rng, workspace_id, direct):
             continue
         upcoming = next_event(s, now, workspace_id)
         if upcoming is None or upcoming > until:

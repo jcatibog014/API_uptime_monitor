@@ -30,6 +30,7 @@ from datetime import datetime, timedelta
 
 from flask import current_app
 from sqlalchemy import select, update
+from sqlalchemy.orm.exc import StaleDataError
 
 from . import checking, queue
 from .models import Gap, Monitor
@@ -77,8 +78,11 @@ def schedule(monitor, now, check_now=False):
         monitor.next_check_at = slot_after(monitor.id, monitor.interval_s, now)
 
 
-def run_due(s, now, workspace_id=None):
-    """Claim every due monitor and queue its check. Returns how many were started."""
+def run_due(s, now, workspace_id=None, direct=False):
+    """Claim every due monitor and queue its check. Returns how many were started.
+
+    direct: run each check straight away instead of queuing a job (the demo's replay:
+    no network, and hours of checks must take seconds). Everything else is the same."""
     rows = s.execute(
         select(Monitor.id, Monitor.next_check_at, Monitor.interval_s, Monitor.workspace_id)
         .where(Monitor.paused.is_(False), Monitor.next_check_at <= now,
@@ -93,9 +97,13 @@ def run_due(s, now, workspace_id=None):
             continue  # another scheduler took this slot a moment ago
         if skipped:
             s.add(Gap(monitor_id=monitor_id, start=planned, end=this_slot, slots=skipped))
-        queue.enqueue(s, "check", {"monitor_id": monitor_id, "scheduled_at": this_slot.isoformat()},
-                      run_at=now, workspace_id=owner_id, priority=3, max_attempts=2,
-                      dedupe_key=f"check:{monitor_id}:{this_slot.isoformat()}")
+        if direct:
+            s.commit()
+            check_slot(s, monitor_id, this_slot, now)
+        else:
+            queue.enqueue(s, "check", {"monitor_id": monitor_id, "scheduled_at": this_slot.isoformat()},
+                          run_at=now, workspace_id=owner_id, priority=3, max_attempts=2,
+                          dedupe_key=f"check:{monitor_id}:{this_slot.isoformat()}")
         started += 1
     s.commit()
     return started
@@ -111,14 +119,30 @@ def next_due(s, workspace_id=None):
 @queue.handler("check")
 def check_job(s, job, now):
     """Check one monitor for one slot, and record it."""
-    monitor = s.get(Monitor, job.payload["monitor_id"])
+    check_slot(s, job.payload["monitor_id"], datetime.fromisoformat(job.payload["scheduled_at"]), now)
+
+
+def check_slot(s, monitor_id, scheduled_at, now):
+    """Check one monitor for one slot, record it, and judge it (incidents.py)."""
+    monitor = s.get(Monitor, monitor_id)
     if monitor is None or monitor.paused:
         return  # deleted or paused since it was queued: nothing to do
-    scheduled_at = datetime.fromisoformat(job.payload["scheduled_at"])
     # End the read before calling the address: no database transaction stays open (holding
     # a connection, and on SQLite maybe a lock) for the up to 30 seconds a check may wait.
     s.commit()
-    result = checking.probe_monitor(monitor, current_app.config)
-    check = checking.record(s, monitor, result, scheduled_at, now)
-    for hook in after_check:
-        hook(s, monitor, check, result, now)
+    result = checking.probe_monitor(monitor, scheduled_at, current_app.config)
+    for _try in range(3):
+        try:
+            check = checking.record(s, monitor, result, scheduled_at, now)
+            for hook in after_check:
+                hook(s, monitor, check, result, now)
+            s.flush()  # here, not at the job's commit, so a stale monitor is caught below
+            return
+        except StaleDataError:
+            # Another worker (or a page) changed this monitor while we checked it. Read it
+            # again and judge again: judged_until makes sure nothing is counted twice.
+            s.rollback()
+            monitor = s.get(Monitor, monitor_id)
+            if monitor is None or monitor.paused:
+                return
+    raise queue.Retry("The monitor kept changing while this check was being saved.")

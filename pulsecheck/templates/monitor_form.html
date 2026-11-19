@@ -10,9 +10,14 @@
   <form method="post" class="card form-card stack" novalidate>
     {{ csrf() }}
     {{ field('name', 'Name', values.name, errors.name, hint='What you call it', attrs='required maxlength="80" autofocus') }}
+    {% if g.workspace.is_demo %}
+      {{ select('service', 'Practice service', services, values.service, errors.service,
+                hint='The demo checks pretend services, never real sites') }}
+    {% else %}
     {{ field('url', 'Address', values.url, errors.url, type='url', hint='Starts with https://',
              note='A health page is best: one that answers quickly and says if the service works.',
              attrs='required maxlength="2000" placeholder="https://api.example.com/health" autocomplete="off" spellcheck="false"') }}
+    {% endif %}
     <div class="form-row">
       {{ select('interval_s', 'How often', intervals, values.interval_s, errors.interval_s) }}
       {{ select('timeout_s', 'Wait for an answer', timeouts, values.timeout_s, errors.timeout_s, hint='Then it counts as down') }}

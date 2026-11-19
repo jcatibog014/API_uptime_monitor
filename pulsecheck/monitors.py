@@ -7,7 +7,7 @@ checking.py does.
 from flask import abort, g
 from sqlalchemy import func, select
 
-from . import probe, targets
+from . import practice, probe, targets
 from .models import Monitor
 
 NAME_MAX_LENGTH = 80
@@ -47,9 +47,9 @@ def defaults():
 
 
 def values_of(monitor):
-    return {"name": monitor.name, "url": monitor.url, "method": monitor.method,
-            "expected_statuses": monitor.expected_statuses, "timeout_s": monitor.timeout_s,
-            "interval_s": monitor.interval_s}
+    return {"name": monitor.name, "url": monitor.url, "service": practice.parse(monitor.url)[0],
+            "method": monitor.method, "expected_statuses": monitor.expected_statuses,
+            "timeout_s": monitor.timeout_s, "interval_s": monitor.interval_s}
 
 
 def _choice(form, name, choices, default):
@@ -60,11 +60,15 @@ def _choice(form, name, choices, default):
     return value if value in dict(choices) else None
 
 
-def read_form(form, allow_private=False):
-    """(values, errors) from a monitor form. errors is empty when it can be saved."""
+def read_form(form, allow_private=False, demo=False):
+    """(values, errors) from a monitor form. errors is empty when it can be saved.
+    demo: a demo's monitor checks one of the practice services (practice.py), never a real address."""
+    service = form.get("service", "")
     values = {
         "name": " ".join(form.get("name", "").split()),
-        "url": targets.clean_url(form.get("url", "")),
+        "kind": "practice" if demo else "http",
+        "service": service,  # only for showing the form again; not a column
+        "url": practice.address(service) if demo else targets.clean_url(form.get("url", "")),
         "method": form.get("method", "GET").upper(),
         "expected_statuses": " ".join(form.get("expected_statuses", "").split()) or "200-299",
         "timeout_s": _choice(form, "timeout_s", TIMEOUTS, 10),
@@ -75,7 +79,10 @@ def read_form(form, allow_private=False):
         errors["name"] = "Give the monitor a name, like Payments API."
     elif len(values["name"]) > NAME_MAX_LENGTH:
         errors["name"] = f"Use at most {NAME_MAX_LENGTH} characters."
-    if problem := targets.url_problem(values["url"], allow_private):
+    if demo:
+        if service not in practice.SERVICES:
+            errors["service"] = "Choose a practice service from the list."
+    elif problem := targets.url_problem(values["url"], allow_private):
         errors["url"] = problem
     if values["method"] not in probe.METHODS:
         errors["method"] = "Choose GET, HEAD or POST."
@@ -93,9 +100,13 @@ def read_form(form, allow_private=False):
 def save(s, workspace, values, monitor=None):
     """Make a new monitor or change one (the caller commits). Returns it."""
     if monitor is None:
-        monitor = Monitor(workspace_id=workspace.id, kind="http")
+        monitor = Monitor(workspace_id=workspace.id)
         s.add(monitor)
+    same_service = practice.is_practice(values["url"]) and monitor.url \
+        and practice.parse(monitor.url)[0] == practice.parse(values["url"])[0]
     for key, value in values.items():
+        if key == "service" or (key == "url" and same_service):
+            continue  # the same practice service: keep its script's settings (like the demo's outage time)
         setattr(monitor, key, value)
     s.flush()
     return monitor

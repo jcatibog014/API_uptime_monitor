@@ -1,7 +1,7 @@
 """Monitor pages: the list, add, change, delete, one monitor's page, and Check now."""
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 
-from .. import checking, db, limits, monitors, probe, scheduler, worker
+from .. import checking, db, incidents, limits, monitors, practice, probe, scheduler, worker
 from ..auth import login_required
 from ..dates import utcnow
 
@@ -25,6 +25,7 @@ def changed(s, monitor, moment):
 def form_page(template, values, errors, monitor=None):
     return render_template(template, values=values, errors=errors, monitor=monitor,
                            intervals=monitors.INTERVALS, timeouts=monitors.TIMEOUTS,
+                           services=practice.choices(),
                            methods=[(method, method) for method in probe.METHODS]), 400 if errors else 200
 
 
@@ -46,7 +47,7 @@ def new():
         return redirect(url_for("monitors.index"))
     if request.method == "GET":
         return form_page("monitor_form.html", monitors.defaults(), {})
-    values, errors = monitors.read_form(request.form, current_app.config["ALLOW_PRIVATE_TARGETS"])
+    values, errors = monitors.read_form(request.form, current_app.config["ALLOW_PRIVATE_TARGETS"], g.workspace.is_demo)
     if errors:
         return form_page("monitor_form.html", values, errors)
     monitor = monitors.save(s, g.workspace, values)
@@ -75,7 +76,7 @@ def edit(monitor_id):
     monitor = monitors.get(s, monitor_id)
     if request.method == "GET":
         return form_page("monitor_form.html", monitors.values_of(monitor), {}, monitor)
-    values, errors = monitors.read_form(request.form, current_app.config["ALLOW_PRIVATE_TARGETS"])
+    values, errors = monitors.read_form(request.form, current_app.config["ALLOW_PRIVATE_TARGETS"], g.workspace.is_demo)
     if errors:
         return form_page("monitor_form.html", values, errors, monitor)
     old_interval = monitor.interval_s
@@ -106,6 +107,7 @@ def pause(monitor_id):
     s = db.session()
     monitor = monitors.get(s, monitor_id)
     monitor.paused = not monitor.paused
+    incidents.reset_streaks(monitor)
     scheduler.schedule(monitor, utcnow(), check_now=True)
     changed(s, monitor, utcnow())
     flash(f"{monitor.name} is paused. It isn't checked until you resume it." if monitor.paused
@@ -125,6 +127,8 @@ def check_now(monitor_id):
         flash("That's a lot of checks in one minute. Please wait a moment.", "error")
         return redirect(url_for("monitors.page", monitor_id=monitor.id))
     check, result = checking.run_check(s, monitor, moment, moment, manual=True)
+    for hook in scheduler.after_check:  # a real observation: it counts like any other check
+        hook(s, monitor, check, result, moment)
     s.commit()
     if result.ok:
         flash(f"Up: {result.message}, in {round(result.total_ms):,} ms.")
@@ -135,3 +139,6 @@ def check_now(monitor_id):
 
 def init_app(app):
     app.jinja_env.globals["monitor_interval"] = lambda monitor: monitors.interval_words(monitor.interval_s)
+    # A practice address keeps its script's settings after "?" (practice.py): not for people to read.
+    app.jinja_env.globals["monitor_address"] = lambda monitor: (
+        monitor.url.split("?")[0] if monitor.kind == "practice" else monitor.url)

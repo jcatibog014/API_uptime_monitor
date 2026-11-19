@@ -94,8 +94,22 @@ class Monitor(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     # When the next check is due (scheduler.py). None while paused.
     next_check_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+    # Failure handling (incidents.py): the state, and the runs of failed and good checks.
+    state: Mapped[str] = mapped_column(String(12), default="new", server_default="new")
+    state_since: Mapped[datetime | None] = mapped_column(DateTime)
+    fail_streak: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    ok_streak: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Failures in a row before it is a Flatline, and good checks in a row before it is up again.
+    confirm_tries: Mapped[int] = mapped_column(Integer, default=3, server_default="3")
+    recover_tries: Mapped[int] = mapped_column(Integer, default=2, server_default="2")
+    # The newest check already judged: an older or repeated one is never counted again.
+    judged_until: Mapped[datetime | None] = mapped_column(DateTime)
+    # Optimistic locking: a save from a stale copy (another worker changed it meanwhile) fails.
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
     workspace: Mapped[Workspace] = relationship()
+
+    __mapper_args__ = {"version_id_col": version}
 
 
 class Check(Base):
@@ -187,3 +201,50 @@ class Worker(Base):
     last_seen: Mapped[datetime] = mapped_column(DateTime)
     jobs_done: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     stopped_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class Incident(Base):
+    """A confirmed failure of one monitor, from its first failed check to its recovery."""
+    __tablename__ = "incidents"
+    __table_args__ = (Index("ix_incidents_workspace_id_opened_at", "workspace_id", "opened_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    monitor_id: Mapped[int] = mapped_column(ForeignKey("monitors.id", ondelete="CASCADE"), index=True)
+    # When it started: the first failed check of the run, not the moment it was confirmed.
+    opened_at: Mapped[datetime] = mapped_column(DateTime)
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
+    cause: Mapped[str | None] = mapped_column(String(20))  # the error_kind of the confirming check
+    message: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    failed_checks: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+    monitor: Mapped[Monitor] = relationship()
+
+    @property
+    def is_open(self):
+        return self.resolved_at is None
+
+
+class CanaryCheck(Base):
+    """Pulse Check checking ITSELF (canary.py): its own address (which also keeps Render
+    awake) and an address outside that is always up. If the outside one fails, the
+    problem is probably our own connection, and failures meanwhile are not counted."""
+    __tablename__ = "canary_checks"
+    __table_args__ = (Index("ix_canary_checks_target_at", "target", "at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    target: Mapped[str] = mapped_column(String(10))  # "self" or "outside"
+    at: Mapped[datetime] = mapped_column(DateTime)
+    ok: Mapped[bool] = mapped_column(Boolean)
+    total_ms: Mapped[float | None] = mapped_column(Float)
+    message: Mapped[str] = mapped_column(String(300), default="", server_default="")
+
+
+class Timer(Base):
+    """When the crew next does something on its own clock (the canary, the rollups).
+    Claimed with a compare-and-swap, so of four worker threads only one does it."""
+    __tablename__ = "timers"
+
+    name: Mapped[str] = mapped_column(String(40), primary_key=True)
+    next_at: Mapped[datetime] = mapped_column(DateTime)

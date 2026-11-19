@@ -22,9 +22,9 @@
             <tr>
               <td>
                 <a class="row-link" href="{{ url_for('monitors.page', monitor_id=monitor.id) }}">{{ monitor.name }}</a>
-                <span class="cell-sub address">{{ monitor.url }}</span>
+                <span class="cell-sub address">{{ monitor_address(monitor) }}</span>
               </td>
-              <td>{% if monitor.paused or not last %}{{ monitor_state(monitor) }}{% else %}{{ check_result(last) }}{% endif %}</td>
+              <td>{{ monitor_state(monitor) }}</td>
               <td class="num" data-label="Response">{% if last and last.ok %}{{ last.total_ms|ms }}{% else %}–{% endif %}</td>
               <td data-label="Checked">{% if last %}{{ last.started_at|ago }}{% else %}Not yet{% endif %}</td>
               <td data-label="How often">{{ monitor_interval(monitor) }}</td>

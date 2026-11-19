@@ -221,7 +221,22 @@ function setUpWatchChanges() {
   });
 }
 
+// A new demo replays its past in the background: the Dashboard reloads when it is done.
+function setUpReplayWatch() {
+  const banner = document.querySelector("[data-replay-url]");
+  if (!banner) return;
+  const check = async () => {
+    try {
+      const response = await fetch(banner.dataset.replayUrl, { headers: { Accept: "application/json" } });
+      if (response.ok && !(await response.json()).replaying) window.location.reload();
+    } catch (error) {
+      // Try again on the next tick.
+    }
+  };
+  setInterval(check, 2000);
+}
+
 // Startup: every part looks for its own elements and does nothing if they aren't on the page.
 const setUps = [setUpToasts, setUpWatchChanges, setUpInstall, setUpTheme, setUpMenu, setUpPopovers,
-  setUpConfirm, setUpAutoSubmit, setUpCopy];
+  setUpConfirm, setUpAutoSubmit, setUpCopy, setUpReplayWatch];
 document.addEventListener("DOMContentLoaded", () => setUps.forEach((setUp) => setUp()));

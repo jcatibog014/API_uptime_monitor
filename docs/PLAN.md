@@ -127,7 +127,7 @@ Every row has `workspace_id`, and every foreign key has a leading index.
 
 - [x] Stage 1: setup and probing
 - [x] Stage 2: scheduled jobs
-- [ ] Stage 3: failure handling + demo
+- [x] Stage 3: failure handling + demo
 - [ ] Stage 4: metrics
 - [ ] Stage 5: alerts
 - [ ] Stage 6: smarter checks
@@ -139,3 +139,4 @@ Every row has `workspace_id`, and every foreign key has a leading index.
 
 - Stage 1: the `checks` table came in stage 1 (not stage 2), so Check now can save its result. It already has the `slow` and `our_side` columns that stages 3 and 6 use.
 - Stage 2: the timer runs every 10 minutes (Right On Cue's ran every 30, to save Neon's awake hours; Supabase has no such limit). The queue's lease is 120 s, not 60, so a sleepy host's 90-second check never looks like a dead worker.
+- Stage 3: the demo replays 3 hours, not 6, and its due checks run straight away (`direct`) instead of as queued jobs: through the queue, 6 hours took 18 s on SQLite and would take minutes on Supabase over the network. The 90 days before come from the same practice scripts in stage 4. The Payments API's demo outage has a fixed time (105 minutes before the visitor), so every demo has a finished incident. The canary's two checks are on the Crew page.

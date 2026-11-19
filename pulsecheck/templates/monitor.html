@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_head, csrf, empty, check_result, monitor_state, phases %}
+{% from "_macros.html" import page_head, csrf, empty, check_result, monitor_state, phases, pulse %}
 {% from "_icons.html" import icon %}
 {% block title %}{{ monitor.name }} - {{ APP_NAME }}{% endblock %}
 {% block content %}
@@ -18,9 +18,19 @@
 
   {% set last = checks[0] if checks else None %}
   <div class="monitor-head">
-    {% if monitor.paused or not last %}{{ monitor_state(monitor) }}{% else %}{{ check_result(last) }}{% endif %}
-    <span class="address">{{ monitor.method }} {{ monitor.url }}</span>
+    {{ monitor_state(monitor) }}
+    <span class="address">{% if monitor.kind == 'http' %}{{ monitor.method }} {% endif %}{{ monitor_address(monitor) }}</span>
   </div>
+
+  {% if open_incident %}
+    <div class="banner" role="status">
+      <div>
+        <strong>Down since {{ open_incident.opened_at|nice_datetime }} ({{ incident_duration(open_incident)|duration }})</strong>
+        {{ error_label(open_incident.cause) }}: {{ open_incident.message }}
+      </div>
+      <a href="{{ url_for('incidents.page', incident_id=open_incident.id) }}">Open the incident</a>
+    </div>
+  {% endif %}
 
   {% for template_name in monitor_panels|default([]) %}{% include template_name %}{% endfor %}
 
@@ -60,6 +70,8 @@
         <dt>Next check</dt><dd>{% if monitor.paused %}Paused{% elif monitor.next_check_at %}{{ monitor.next_check_at|clock }} ({{ monitor.next_check_at|from_now }}){% else %}–{% endif %}</dd>
         <dt>Wait</dt><dd>{{ monitor.timeout_s }} seconds</dd>
         <dt>Good answers</dt><dd>{{ monitor.expected_statuses }}</dd>
+        <dt>Down after</dt><dd>{{ monitor.confirm_tries }} failed checks in a row</dd>
+        <dt>Up again after</dt><dd>{{ monitor.recover_tries }} good checks in a row</dd>
         {% for template_name in monitor_facts|default([]) %}{% include template_name %}{% endfor %}
       </dl>
       <form method="post" action="{{ url_for('monitors.delete', monitor_id=monitor.id) }}" class="top-gap"
@@ -70,6 +82,27 @@
     </section>
   </div>
 
+  {% if recent_incidents %}
+  <section class="section top-gap">
+    <div class="card-head"><h2>Recent Incidents</h2><a class="head-link" href="{{ url_for('incidents.index') }}">Every incident</a></div>
+    <div class="table-wrap">
+      <table class="fit-table">
+        <thead><tr><th>Started</th><th>Now</th><th>Why</th><th class="num">How Long</th></tr></thead>
+        <tbody>
+          {% for incident in recent_incidents %}
+            <tr>
+              <td><a class="row-link" href="{{ url_for('incidents.page', incident_id=incident.id) }}">{{ incident.opened_at|nice_datetime }}</a></td>
+              <td>{{ pulse(incident_word(incident)) }}</td>
+              <td data-label="Why">{{ error_label(incident.cause) }}</td>
+              <td class="num" data-label="How long">{{ incident_duration(incident)|duration }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
   <section class="section top-gap">
     <div class="card-head"><h2>Recent Checks</h2></div>
     {% if checks %}
@@ -79,7 +112,7 @@
           <tbody>
             {% for check in checks %}
               <tr>
-                <td>{{ check.started_at|nice_datetime }}</td>
+                <td>{{ check.scheduled_at|check_time }}</td>
                 <td>{{ check_result(check) }}</td>
                 <td class="num" data-label="Status">{{ check.status_code or '–' }}</td>
                 <td class="num" data-label="Response">{{ check.total_ms|ms }}</td>

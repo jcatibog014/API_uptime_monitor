@@ -6,7 +6,7 @@ from statistics import median
 from flask import Blueprint, current_app, flash, g, redirect, render_template, url_for
 from sqlalchemy import func, select
 
-from .. import db, queue, worker
+from .. import canary, db, queue, worker
 from ..auth import login_required, not_for_demo
 from ..dates import utcnow
 from ..models import Check, Gap, Job, Monitor, Worker
@@ -71,6 +71,7 @@ def index():
     typical, worst, checked = lag_numbers(s, g.workspace.id, now)
     on_duty = any(state == "on" for _row, _name, state in numbered)
     return render_template("crew.html", workers=numbered, counts=counts, dead=dead, gaps=gaps, kinds=KINDS,
+                           canary=canary.latest(s), canary_on=bool(canary.targets(current_app.config)),
                            lag_typical=typical, lag_worst=worst, lag_count=checked, on_duty=on_duty,
                            can_start=current_app.config.get("RUN_WORKER") and not worker.in_app_running())
 

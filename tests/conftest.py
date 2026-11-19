@@ -162,7 +162,7 @@ class Site(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802 (the name http.server asks for)
         self.server.seen.append((self.command, self.path, self.headers.get("User-Agent")))
         path, _, query = self.path.partition("?")
-        if path == "/ok":
+        if path in ("/ok", "/healthz"):
             self.answer(200, b"all good")
         elif path == "/json":
             self.answer(200, json.dumps({"status": "ok", "db": {"up": True}}).encode(),

@@ -20,7 +20,7 @@ def test_upgrade_on_an_empty_database_matches_the_models(tmp_path):
     # migrations and the models agree. If this fails after changing
     # models.py, make a new migration (see AGENTS.md).
     assert differences == []
-    assert {"workspaces", "users", "rate_limits", "monitors", "checks", "jobs", "workers", "gaps", "alembic_version"} <= tables
+    assert {"workspaces", "users", "rate_limits", "monitors", "checks", "jobs", "workers", "gaps", "incidents", "canary_checks", "timers", "alembic_version"} <= tables
 
 
 def test_upgrade_db_command(tmp_path):

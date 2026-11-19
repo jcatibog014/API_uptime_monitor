@@ -50,6 +50,17 @@ def nice_datetime(moment, zone_name=None):
     return f"{short_date(moment, zone_name)}, {clock(moment, zone_name)}"
 
 
+def check_time(moment, zone_name=None):
+    """Like nice_datetime, with seconds when it has any: a re-check 20 seconds after a
+    failure must not look like a second check "at 9:06" beside the first one."""
+    if moment is None:
+        return ""
+    if not moment.second:
+        return nice_datetime(moment, zone_name)
+    stamp = local(moment, zone_name)
+    return f"{short_date(moment, zone_name)}, {stamp.hour % 12 or 12}:{stamp:%M:%S %p}"
+
+
 def ago(moment):
     """How long ago: just now, 5 min ago, 3 h ago, Oct 30."""
     if moment is None:
@@ -150,7 +161,7 @@ def uptime(part, whole):
 
 
 def init_app(app):
-    for function in (nice_date, short_date, clock, nice_datetime, ago, from_now, duration, number, iso_local,
+    for function in (nice_date, short_date, clock, nice_datetime, check_time, ago, from_now, duration, number, iso_local,
                      day_iso, ms):
         app.jinja_env.filters[function.__name__] = function
     app.jinja_env.globals.update(plural=plural, percent=percent, uptime=uptime)

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, pulse, check_result, phases %}
+{% block title %}{{ incident.monitor.name }} Incident - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {% call page_head(incident.monitor.name ~ ' Incident', back=url_for('incidents.index'), back_label='Incidents') %}
+    {% for template_name in incident_actions|default([]) %}{% include template_name %}{% endfor %}
+    <a class="button button-quiet" href="{{ url_for('monitors.page', monitor_id=incident.monitor_id) }}">Open the monitor</a>
+  {% endcall %}
+
+  <div class="monitor-head">
+    {{ pulse(incident_word(incident)) }}
+    <span class="address">{{ monitor_address(incident.monitor) }}</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat{% if incident.is_open %} stat-flat{% endif %}">
+      <div class="stat-label">{{ 'Down for' if incident.is_open else 'Was down for' }}</div>
+      <div class="readout">{{ incident_duration(incident)|duration }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Why</div>
+      <div class="readout readout-word">{{ error_label(incident.cause) }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Failed Checks</div>
+      <div class="readout">{{ incident.failed_checks }}</div>
+    </div>
+  </div>
+
+  {% for template_name in incident_panels|default([]) %}{% include template_name %}{% endfor %}
+
+  <div class="split">
+    <section class="card">
+      <div class="card-head"><h2>What Happened</h2></div>
+      <ol class="timeline">
+        <li><span class="timeline-time">{{ incident.opened_at|check_time }}</span> The first check failed: {{ incident.message }}</li>
+        <li><span class="timeline-time">{{ incident.confirmed_at|check_time }}</span> Still failing after {{ incident.monitor.confirm_tries }} checks in a row: confirmed down, and the incident opened.</li>
+        {% for line in incident_timeline|default([]) %}<li><span class="timeline-time">{{ line.at|nice_datetime }}</span> {{ line.text }}</li>{% endfor %}
+        {% if incident.resolved_at %}
+          <li><span class="timeline-time">{{ incident.resolved_at|check_time }}</span> Back up: {{ incident.monitor.recover_tries }} good checks in a row.</li>
+        {% else %}
+          <li class="muted">Still down. It closes after {{ incident.monitor.recover_tries }} good checks in a row.</li>
+        {% endif %}
+      </ol>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Details</h2></div>
+      <dl class="facts">
+        <dt>Started</dt><dd>{{ incident.opened_at|nice_datetime }}</dd>
+        <dt>Confirmed</dt><dd>{{ incident.confirmed_at|nice_datetime }}</dd>
+        <dt>Ended</dt><dd>{{ incident.resolved_at|nice_datetime if incident.resolved_at else 'Not yet' }}</dd>
+        {% for template_name in incident_facts|default([]) %}{% include template_name %}{% endfor %}
+      </dl>
+    </section>
+  </div>
+
+  <section class="section top-gap">
+    <div class="card-head"><h2>Checks During the Incident</h2></div>
+    <div class="table-wrap">
+      <table class="fit-table check-table">
+        <thead><tr><th>When</th><th>Result</th><th class="num">Status</th><th class="num">Response</th><th>Note</th></tr></thead>
+        <tbody>
+          {% for check in checks %}
+            <tr>
+              <td>{{ check.scheduled_at|check_time }}{% if check.manual %} <span class="muted small">(Check now)</span>{% endif %}</td>
+              <td>{{ check_result(check) }}</td>
+              <td class="num" data-label="Status">{{ check.status_code or '–' }}</td>
+              <td class="num" data-label="Response">{{ check.total_ms|ms }}</td>
+              <td class="small">{{ check.message }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

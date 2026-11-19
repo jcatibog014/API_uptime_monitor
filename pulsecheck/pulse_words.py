@@ -43,6 +43,12 @@ CHECK = {
                                  "probably our connection, not this service. Not counted.", "quiet"),
 }
 
+# An incident (incidents.py).
+INCIDENT = {
+    "open": Word("Ongoing", "Still down. It closes by itself after a few good checks in a row.", "flat"),
+    "resolved": Word("Resolved", "It is back up.", "steady"),
+}
+
 # A member of the crew (worker.py), on the Crew page.
 WORKER = {
     "on": Word("On Duty", "Working: it wrote its heartbeat in the last 2 minutes.", "steady"),
@@ -75,11 +81,15 @@ def monitor_state_name(monitor):
     return getattr(monitor, "state", None) or "new"
 
 
+def incident_word(incident):
+    return INCIDENT["open" if incident.resolved_at is None else "resolved"]
+
+
 def check_word(check):
     """The word for one Check row."""
     if check.ok:
-        return CHECK["slow" if check.slow else "beat"]
-    return CHECK["our_side" if check.our_side else "missed"]
+        return CHECK["slow" if getattr(check, "slow", False) else "beat"]
+    return CHECK["our_side" if getattr(check, "our_side", False) else "missed"]
 
 
 def error_label(kind):
@@ -88,4 +98,5 @@ def error_label(kind):
 
 def init_app(app):
     app.jinja_env.globals.update(pulse_state=state, check_word=check_word, error_label=error_label,
-                                 monitor_state_name=monitor_state_name, worker_word=WORKER.get)
+                                 monitor_state_name=monitor_state_name, worker_word=WORKER.get,
+                                 incident_word=incident_word)

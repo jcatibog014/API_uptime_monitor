@@ -78,12 +78,20 @@ def create_app(test_config=None):
         # off (RUN_WORKER=0) and run `flask --app pulsecheck worker` in its own window.
         RUN_WORKER=env_flag("RUN_WORKER", True),
         CREW_SIZE=int(os.environ.get("CREW_SIZE", "4")),
+        # The canary (canary.py): the crew checks its own address every minute (on Render
+        # that also keeps the free plan from sleeping) and one outside address that is
+        # always up. CANARY_URL="" turns the outside check off.
+        SELF_CHECK=env_flag("SELF_CHECK", True),
+        CANARY_URL=os.environ.get("CANARY_URL", "https://www.gstatic.com/generate_204"),
     )
     if test_config:
         app.config.update(test_config)
     if app.testing:
         # Tests run the crew by hand (worker.simulate), never in threads of their own.
         app.config["RUN_WORKER"] = bool(test_config and test_config.get("RUN_WORKER"))
+        # ...and never call the internet: no canary unless a test asks for one.
+        app.config["SELF_CHECK"] = bool(test_config and test_config.get("SELF_CHECK"))
+        app.config["CANARY_URL"] = (test_config or {}).get("CANARY_URL", "")
     if on_render:
         # Render's proxy talks HTTPS to the visitor and HTTP to us. This makes Flask
         # believe the X-Forwarded-* headers: links start with https://, and the rate
@@ -97,8 +105,9 @@ def create_app(test_config=None):
         # Without it we'd use a SQLite file, and Render forgets files on every restart.
         raise RuntimeError("Set the DATABASE_URL environment variable on Render (Supabase's connection string).")
 
-    from . import auth, db, formatting, pulse_words, scheduler, tick, worker  # noqa: F401 (scheduler registers its jobs)
-    from .views import crew, dashboard, monitors, settings
+    from . import auth, canary, db, formatting, incidents, pulse_words, scheduler, seed, tick, worker  # noqa: F401
+    from .views import crew, dashboard, demo, monitors, settings
+    from .views import incidents as incident_views
 
     db.init_app(app)
     auth.init_app(app)
@@ -109,8 +118,12 @@ def create_app(test_config=None):
     crew.init_app(app)
     tick.init_app(app)
     worker.init_app(app)
+    incidents.init_app(app)
+    incident_views.init_app(app)
+    canary.init_app(app)
+    seed.init_app(app)
     # auth comes first: its before_request (load_user) must run before the others'.
-    for blueprint in (auth.bp, dashboard.bp, monitors.bp, crew.bp, settings.bp, tick.bp):
+    for blueprint in (auth.bp, dashboard.bp, monitors.bp, incident_views.bp, crew.bp, settings.bp, demo.bp, tick.bp):
         app.register_blueprint(blueprint)
 
     app.jinja_env.globals.update(APP_NAME=APP_NAME, TAGLINE=TAGLINE,

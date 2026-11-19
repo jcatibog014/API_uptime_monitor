@@ -14,9 +14,10 @@ panels = []
 def home():
     s = db.session()
     rows = [(monitor, checking.last(s, monitor.id)) for monitor in monitors.all_of(s, g.workspace.id)]
-    checked = [last for _monitor, last in rows if last is not None]
-    data = {"rows": rows, "up": sum(1 for last in checked if last.ok),
-            "down": sum(1 for last in checked if not last.ok)}
+    live = [monitor for monitor, _last in rows if not monitor.paused]
+    data = {"rows": rows, "up": sum(1 for monitor in live if monitor.state in ("steady", "weak")),
+            "down": sum(1 for monitor in live if monitor.state == "flatline"),
+            "checking": sum(1 for monitor in live if monitor.state == "irregular")}
     for panel in panels:
         data.update(panel(s, g.workspace))
     return render_template("dashboard.html", **data)
