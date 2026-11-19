@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>{{ page.name }}</title>
+    <link>{{ config.BASE_URL }}/status/{{ page.slug }}</link>
+    <description>Incidents and notes from {{ page.name }}.</description>
+    {% for item in items %}
+    <item>
+      <title>{{ item.title }}</title>
+      <link>{{ config.BASE_URL }}/status/{{ page.slug }}</link>
+      <guid isPermaLink="false">{{ page.slug }}-{{ item.id }}</guid>
+      <pubDate>{{ item.date }}</pubDate>
+      <description>{{ item.text }}</description>
+    </item>
+    {% endfor %}
+  </channel>
+</rss>

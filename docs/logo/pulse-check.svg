@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Pulse Check's mark: a heartbeat line on a little monitor screen. -->
+  <defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d2219"/>
+      <stop offset="1" stop-color="#040a07"/>
+    </linearGradient>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse" x="0" y="0">
+      <path d="M64 0H0V64" fill="none" stroke="#34d399" stroke-opacity=".16" stroke-width="3"/>
+    </pattern>
+    <filter id="glow" x="-20%" y="-40%" width="140%" height="180%">
+      <feGaussianBlur stdDeviation="9" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#glass)"/>
+  <rect x="16" y="16" width="480" height="480" rx="98" fill="url(#grid)"/>
+  <rect x="10" y="10" width="492" height="492" rx="104" fill="none" stroke="#2b3531" stroke-width="12"/>
+  <path d="M60 286 H170 L196 318 L236 128 L282 384 L314 260 L330 286 H452"
+        fill="none" stroke="#34d399" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+  <circle cx="452" cy="286" r="22" fill="#d8f5e6"/>
+</svg>

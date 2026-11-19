@@ -1,0 +1,57 @@
+{% from "_icons.html" import logo, icon %}
+{% from "_macros.html" import avatar, csrf %}
+{% from "_trace.html" import trace %}
+{% set page = request.endpoint or '' %}
+{% set section = page.split('.')[0] %}
+{# One menu entry. It shows only once its part of the app exists. #}
+{% macro link(endpoint, label, icon_name, here) %}
+  {% if has_page(endpoint) %}
+  <li><a href="{{ url_for(endpoint) }}"{% if here %} aria-current="page"{% endif %}>{{ icon(icon_name) }} {{ label }}{% if caller %}{{ caller() }}{% endif %}</a></li>
+  {% endif %}
+{% endmacro %}
+{% set flat = any_flatline(g.workspace) if any_flatline is defined else False %}
+<aside class="sidebar bezel">
+ <div class="sidebar-inner">
+  <div class="sidebar-screen screen">
+    <div class="sidebar-top">
+      <a class="logo" href="{{ url_for('dashboard.home') }}">{{ logo(36) }} {{ APP_NAME }}</a>
+      {% if g.user.is_demo %}<span class="demo-tag" title="A sandbox: it checks practice services, and its alerts go to a Practice Inbox.">Demo</span>{% endif %}
+      <button class="menu-button" type="button" data-menu-button aria-expanded="false" aria-controls="side-nav" aria-label="Menu" hidden>
+        <span aria-hidden="true">&#9776;</span>
+      </button>
+    </div>
+    {{ trace(flat, 'A monitor is down' if flat else None) }}
+  </div>
+  <div class="sidebar-menu" id="side-nav">
+    <nav aria-label="Main">
+      <ul class="side-links">
+        {{ link('dashboard.home', 'Dashboard', 'dashboard', section == 'dashboard') }}
+        {{ link('monitors.index', 'Monitors', 'monitors', section == 'monitors') }}
+        {% call link('incidents.index', 'Incidents', 'incidents', section == 'incidents') %}{% set open_count = open_incidents(g.workspace) if open_incidents is defined else 0 %}{% if open_count %}<span class="count" title="Open incidents">{{ open_count }}</span>{% endif %}{% endcall %}
+        {{ link('alerts.index', 'Alerts', 'alerts', section == 'alerts') }}
+        {{ link('status_pages.index', 'Status Pages', 'status', section == 'status_pages') }}
+        {{ link('insights.index', 'Insights', 'insights', section == 'insights') }}
+        {{ link('crew.index', 'Crew', 'crew', section == 'crew') }}
+        {{ link('settings.page', 'Settings', 'settings', section == 'settings') }}
+      </ul>
+    </nav>
+    <div class="sidebar-foot">
+      {# <details> opens and closes without JavaScript. app.js also closes it on an outside click. #}
+      <details class="user-menu" data-popover>
+        <summary>
+          {{ avatar(g.user) }}
+          <span class="user-menu-name"><span><span class="visually-hidden">Account menu for </span>{{ g.user.name }}</span>
+            <small>{{ g.workspace.name }}</small></span>
+        </summary>
+        <div class="user-menu-items">
+          <a href="{{ url_for('settings.page') }}">Settings</a>
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            {{ csrf() }}
+            <button type="submit">{{ 'Leave the demo' if g.user.is_demo else 'Log out' }}</button>
+          </form>
+        </div>
+      </details>
+    </div>
+  </div>
+ </div>
+</aside>

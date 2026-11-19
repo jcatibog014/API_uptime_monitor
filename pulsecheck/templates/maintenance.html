@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, csrf, field, pulse %}
+{% from "_icons.html" import icon %}
+{% block title %}Maintenance - {{ APP_NAME }}{% endblock %}
+{% macro window_row(window, past=False) %}
+  <tr>
+    <td><strong>{{ window.title }}</strong>{% if window.note %}<span class="cell-sub small muted">{{ window.note }}</span>{% endif %}</td>
+    <td data-label="From">{{ window.starts_at|nice_datetime }}</td>
+    <td data-label="To">{{ window.ends_at|nice_datetime }}</td>
+    <td class="small" data-label="Monitors">{{ window.monitors|map(attribute='name')|join(', ') }}</td>
+    <td>{% if not past and window.starts_at <= now %}{{ pulse(pulse_state('resting')) }}{% endif %}</td>
+    <td>{% if not past %}<form method="post" action="{{ url_for('status_pages.delete_window', window_id=window.id) }}" data-confirm="Delete {{ window.title }}?">{{ csrf() }}<button class="button button-quiet button-small" type="submit">Delete</button></form>{% endif %}</td>
+  </tr>
+{% endmacro %}
+{% block content %}
+  {{ page_head('Status Pages') }}
+  {% include "_status_tabs.html" %}
+
+  <section class="section">
+    <div class="card-head"><h2>Planned and Now</h2></div>
+    {% if upcoming %}
+      <div class="table-wrap">
+        <table class="fit-table">
+          <thead><tr><th>Work</th><th>From</th><th>To</th><th>Monitors</th><th><span class="visually-hidden">Now</span></th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+          <tbody>{% for window in upcoming %}{{ window_row(window) }}{% endfor %}</tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">No maintenance is planned.</p>
+    {% endif %}
+  </section>
+
+  <section class="section">
+    <div class="card-head"><h2>Plan Maintenance</h2></div>
+    <form method="post" class="card form-card stack" novalidate>
+      {{ csrf() }}
+      <p class="muted">During the work, its monitors are still checked, but they rest: no incidents, no alerts, and not counted in uptime. Status pages show it.</p>
+      {{ field('title', 'Work', form.get('title', ''), errors.title, hint='Like Database upgrade', attrs='required maxlength="120"') }}
+      <div class="form-row">
+        {{ field('starts_at', 'From', form.get('starts_at', ''), errors.starts_at, type='datetime-local', hint=g.workspace.time_zone.replace('_', ' '), attrs='required') }}
+        {{ field('ends_at', 'To', form.get('ends_at', ''), errors.ends_at, type='datetime-local', attrs='required') }}
+      </div>
+      {{ field('note', 'Note for status pages', form.get('note', ''), errors.note, hint='Optional', attrs='maxlength="500"') }}
+      <fieldset class="stack-small{% if errors.monitor %} has-error{% endif %}">
+        <legend class="field-label">Monitors that rest</legend>
+        <div class="check-grid">
+          {% for monitor in monitors %}
+            <label class="check"><input type="checkbox" name="monitor" value="{{ monitor.id }}"{% if (monitor.id|string) in form.getlist('monitor') %} checked{% endif %}> {{ monitor.name }}</label>
+          {% endfor %}
+        </div>
+        {% if errors.monitor %}<p class="field-error">{{ errors.monitor }}</p>{% endif %}
+      </fieldset>
+      <div class="form-actions"><button class="button" type="submit">Plan maintenance</button></div>
+    </form>
+  </section>
+
+  {% if past %}
+  <section class="section">
+    <div class="card-head"><h2>Past Maintenance</h2></div>
+    <div class="table-wrap">
+      <table class="fit-table">
+        <thead><tr><th>Work</th><th>From</th><th>To</th><th>Monitors</th><th></th><th></th></tr></thead>
+        <tbody>{% for window in past %}{{ window_row(window, past=True) }}{% endfor %}</tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+{% endblock %}

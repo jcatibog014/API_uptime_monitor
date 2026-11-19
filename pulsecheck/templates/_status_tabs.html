@@ -1,0 +1,7 @@
+{% set here = request.endpoint %}
+<nav aria-label="Status pages">
+  <ul class="tabs">
+    <li><a href="{{ url_for('status_pages.index') }}"{% if here in ('status_pages.index', 'status_pages.edit') %} aria-current="page"{% endif %}>Pages</a></li>
+    <li><a href="{{ url_for('status_pages.windows') }}"{% if here == 'status_pages.windows' %} aria-current="page"{% endif %}>Maintenance</a></li>
+  </ul>
+</nav>

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, empty, pulse %}
+{% block title %}Sent Alerts - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {{ page_head('Alerts') }}
+  {% include "_alert_tabs.html" %}
+  {% if rows %}
+    <div class="table-wrap">
+      <table class="fit-table">
+        <thead><tr><th>Alert</th><th>Channel</th><th>Now</th><th class="num">Tries</th><th>When</th></tr></thead>
+        <tbody>
+          {% for alert in rows %}
+            <tr>
+              <td>
+                {% if alert.incident_id %}<a class="row-link" href="{{ url_for('incidents.page', incident_id=alert.incident_id) }}">{{ alert.title }}</a>{% else %}<strong>{{ alert.title }}</strong>{% endif %}
+                {% if alert.last_error and alert.status != 'sent' %}<span class="cell-sub small field-error">{{ alert.last_error }}</span>{% endif %}
+              </td>
+              <td data-label="Channel">{{ alert.channel.name }}</td>
+              <td>{{ pulse(alert_word(alert.status)) }}</td>
+              <td class="num" data-label="Tries">{{ alert.tries }}</td>
+              <td data-label="When">{{ (alert.sent_at or alert.created_at)|check_time }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    {{ empty('No Alerts Yet', 'Alerts show here when a monitor goes down or comes back, or when you send a test.') }}
+  {% endif %}
+{% endblock %}

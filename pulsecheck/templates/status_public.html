@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ page.name }}{% endblock %}
+{% block layout %}
+  <main class="status-public" id="main">
+    <header class="status-top">
+      <h1>{{ page.name }}</h1>
+      {% if page.intro %}<p class="muted">{{ page.intro }}</p>{% endif %}
+      {% set overall_label, overall_tone = overall %}
+      <p class="status-overall tone-{{ overall_tone }}"><span class="pulse pulse-{{ overall_tone }}" aria-hidden="true"></span> {{ overall_label }}</p>
+    </header>
+
+    {% for window in windows %}
+      <section class="status-card status-window">
+        <h2>{{ 'Maintenance Now' if window.starts_at <= now() else 'Planned Maintenance' }}: {{ window.title }}</h2>
+        <p class="muted small">{{ window.starts_at|nice_datetime(zone_name) }} to {{ window.ends_at|nice_datetime(zone_name) }} ({{ zone_name.replace('_', ' ') }})</p>
+        {% if window.note %}<p>{{ window.note }}</p>{% endif %}
+      </section>
+    {% endfor %}
+
+    {% for incident in open_incidents %}
+      <section class="status-card status-incident">
+        <h2>{{ labels[incident.monitor_id] }}: {{ 'Down' }}</h2>
+        <p class="muted small">Since {{ incident.opened_at|nice_datetime(zone_name) }}</p>
+        {% set notes = updates[incident.id] %}
+        {% if notes %}
+          <ol class="timeline top-gap-small">
+            {% for note in notes %}<li><span class="timeline-time">{{ note.created_at|check_time(zone_name) }} · {{ note_label(note.status) }}</span> {{ note.message }}</li>{% endfor %}
+          </ol>
+        {% else %}
+          <p>We know about it and are looking into it.</p>
+        {% endif %}
+      </section>
+    {% endfor %}
+
+    <section class="status-card">
+      <ul class="status-rows">
+        {% for row in rows %}
+          {% set label, tone, _order = public_word(row.state) %}
+          <li>
+            <div class="status-row-head">
+              <h2>{{ row.label }}</h2>
+              <span class="status-uptime">{{ uptime(row.uptime.ok, row.uptime.counted) }} in 90 days</span>
+              <span class="pulse pulse-{{ tone }}">{{ label }}</span>
+            </div>
+            {% set strip = strip_of(row.days) %}
+            <svg class="strip" viewBox="0 0 {{ strip.width }} {{ strip.height }}" preserveAspectRatio="none" role="img" aria-label="{{ row.label }}: uptime per day for the last 90 days">
+              {% for bar in strip.bars %}<rect class="s-{{ bar.day.level }}" x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.width }}" height="{{ bar.height }}" rx="1.5"><title>{{ bar.day.start|nice_date(zone_name) }}: {% if bar.day.level == 'none' %}not checked{% else %}{{ uptime(bar.day.stats.ok, bar.day.stats.counted) }} up{% endif %}</title></rect>{% endfor %}
+            </svg>
+          </li>
+        {% endfor %}
+      </ul>
+      <div class="strip-axis"><span>90 days ago</span><span>Today</span></div>
+      <ul class="strip-legend">
+        <li><span class="s-key s-key-up" aria-hidden="true"></span> Up all day</li>
+        <li><span class="s-key s-key-some" aria-hidden="true"></span> Some downtime</li>
+        <li><span class="s-key s-key-down" aria-hidden="true"></span> Down a lot</li>
+        <li><span class="s-key s-key-none" aria-hidden="true"></span> Not checked</li>
+      </ul>
+    </section>
+
+    <section class="status-card">
+      <h2>Last 7 Days</h2>
+      {% if recent %}
+        <ul class="plain-list top-gap-small">
+          {% for incident in recent %}
+            <li>
+              <strong>{{ labels[incident.monitor_id] }}</strong> was down for {{ ((incident.resolved_at - incident.opened_at).total_seconds())|duration }}
+              <span class="muted small">· {{ incident.opened_at|nice_datetime(zone_name) }}</span>
+              {% for note in updates[incident.id] %}<p class="small"><span class="muted">{{ note_label(note.status) }}:</span> {{ note.message }}</p>{% endfor %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted top-gap-small">No incidents in the last 7 days.</p>
+      {% endif %}
+    </section>
+
+    <footer class="status-foot">
+      <a href="{{ url_for('public.feed', slug=page.slug) }}">Get updates by RSS</a> · Times in {{ zone_name.replace('_', ' ') }} · Watched by {{ APP_NAME }}
+    </footer>
+  </main>
+{% endblock %}

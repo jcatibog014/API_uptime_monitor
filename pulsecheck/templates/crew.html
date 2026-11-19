@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, csrf, empty, pulse %}
+{% from "_icons.html" import icon %}
+{% block title %}Crew - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {% call page_head('Crew') %}
+    {% if can_start and not g.user.is_demo %}
+      <form method="post" action="{{ url_for('crew.start') }}">
+        {{ csrf() }}
+        <button class="button" type="submit">{{ icon('play') }} Start the crew</button>
+      </form>
+    {% endif %}
+  {% endcall %}
+
+  {% for template_name in crew_banners|default([]) %}{% include template_name %}{% endfor %}
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Check Lag</div>
+      <div class="readout">{% if lag_typical is not none %}{{ '%.1f'|format(lag_typical) }}<small>s</small>{% else %}–{% endif %}</div>
+      <div class="stat-note">{% if lag_count %}Typical, last hour (worst {{ '%.1f'|format(lag_worst) }} s){% else %}No checks in the last hour{% endif %}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Waiting</div>
+      <div class="readout">{{ counts.get('queued', 0) }}</div>
+      <div class="stat-note">Jobs in the queue</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Running</div>
+      <div class="readout">{{ counts.get('running', 0) }}</div>
+      <div class="stat-note">Jobs in hand</div>
+    </div>
+    <div class="stat{% if counts.get('dead') %} stat-flat{% endif %}">
+      <div class="stat-label">Dead Letters</div>
+      <div class="readout">{{ counts.get('dead', 0) }}</div>
+      <div class="stat-note">Gave up; need you</div>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="card-head"><h2>Workers</h2></div>
+    {% if workers %}
+      <div class="table-wrap">
+        <table class="fit-table">
+          <thead><tr><th>Worker</th><th>Now</th><th class="num">Jobs Done</th><th>Last Heartbeat</th></tr></thead>
+          <tbody>
+            {% for row, name, state in workers %}
+              <tr>
+                <td><strong>{{ name }}</strong><span class="cell-sub muted small">Since {{ row.started_at|nice_datetime }}</span></td>
+                <td>{{ pulse(worker_word(state)) }}</td>
+                <td class="num" data-label="Jobs">{{ row.jobs_done|number }}</td>
+                <td data-label="Heartbeat">{{ row.last_seen|ago }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      {{ empty('Nobody on Duty', 'No worker has written a heartbeat in the last hour, so no checks are being made.') }}
+    {% endif %}
+  </section>
+
+  {% if canary_on %}
+  <section class="section" id="self-check">
+    <div class="card-head"><h2>Self-Check</h2></div>
+    <div class="table-wrap">
+      <table class="fit-table">
+        <thead><tr><th>Check</th><th>Now</th><th class="num">Response</th><th>When</th></tr></thead>
+        <tbody>
+          {% for name, label, why in [('self', 'Our own address', 'Keeps the free plan awake'), ('outside', 'An outside address', 'If it fails, failures are our side')] %}
+            {% set row = canary.get(name) %}
+            <tr>
+              <td><strong>{{ label }}</strong><span class="cell-sub muted small">{{ why }}</span></td>
+              <td>{% if row %}{{ pulse(check_word(row)) }}{% else %}{{ pulse(pulse_state('new')) }}{% endif %}</td>
+              <td class="num" data-label="Response">{{ row.total_ms|ms if row else '–' }}</td>
+              <td data-label="When">{{ row.at|ago if row else 'Not yet' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="section" id="dead">
+    <div class="card-head"><h2>Dead Letters</h2></div>
+    {% if dead %}
+      <div class="table-wrap">
+        <table class="fit-table">
+          <thead><tr><th>Job</th><th>Why It Gave Up</th><th class="num">Tries</th><th>When</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+          <tbody>
+            {% for job in dead %}
+              <tr>
+                <td><strong>{{ job_kind(job.kind) }}</strong></td>
+                <td class="small">{{ job.last_error|truncate(160) }}</td>
+                <td class="num" data-label="Tries">{{ job.attempts }}</td>
+                <td data-label="When">{{ job.finished_at|ago }}</td>
+                <td>
+                  <div class="form-actions">
+                    <form method="post" action="{{ url_for('crew.discard', job_id=job.id) }}">{{ csrf() }}<button class="button button-quiet button-small" type="submit">Discard</button></form>
+                    <form method="post" action="{{ url_for('crew.retry', job_id=job.id) }}">{{ csrf() }}<button class="button button-small" type="submit">Retry now</button></form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">No dead letters. Every job either finished or is still being tried.</p>
+    {% endif %}
+  </section>
+
+  <section class="section" id="gaps">
+    <div class="card-head"><h2>Gaps</h2></div>
+    {% if gaps %}
+      <div class="table-wrap">
+        <table class="fit-table">
+          <thead><tr><th>Monitor</th><th>Not Checked From</th><th>Until</th><th class="num">Checks Skipped</th></tr></thead>
+          <tbody>
+            {% for gap, name in gaps %}
+              <tr>
+                <td><strong>{{ name }}</strong></td>
+                <td data-label="From">{{ gap.start|nice_datetime }}</td>
+                <td data-label="Until">{{ gap.end|nice_datetime }}</td>
+                <td class="num" data-label="Skipped">{{ gap.slots|number }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted small top-gap">Nobody looked during a gap (the site was asleep or the crew was stopped), so uptime leaves these minutes out.</p>
+    {% else %}
+      <p class="muted">No gaps: every check happened on time.</p>
+    {% endif %}
+  </section>
+{% endblock %}

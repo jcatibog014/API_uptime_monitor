@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, empty %}
+{% from "_icons.html" import icon %}
+{% block title %}Insights - {{ APP_NAME }}{% endblock %}
+{% macro delta(points, unit=' pts') %}
+  {%- if points is none %}<span class="muted">–</span>
+  {%- elif points > 0 %}<span class="delta delta-better">{{ icon('arrow-up', 14) }} {{ '%.2f'|format(points) }}{{ unit }} better</span>
+  {%- elif points < 0 %}<span class="delta delta-worse">{{ icon('arrow-down', 14) }} {{ '%.2f'|format(-points) }}{{ unit }} worse</span>
+  {%- else %}<span class="muted">The same</span>{% endif %}
+{%- endmacro %}
+{% block content %}
+  {% call page_head('Insights') %}
+    <a class="button button-quiet" href="{{ url_for('insights.export', period=period) }}">{{ icon('download') }} Download CSV</a>
+  {% endcall %}
+  <nav aria-label="Period">
+    <ul class="tabs">
+      {% for key, (label, _days) in periods.items() %}
+        <li><a href="{{ url_for('insights.index', period=key) }}"{% if key == period %} aria-current="page"{% endif %}>Last {{ label }}</a></li>
+      {% endfor %}
+    </ul>
+  </nav>
+
+  {% if not rows %}
+    {{ empty('Nothing to Show Yet', 'Insights compare your monitors over time. Add a monitor, and come back in a day or two.') }}
+  {% else %}
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Uptime, Every Monitor</div>
+        <div class="readout">{{ uptime(total_now.ok, total_now.counted) }}</div>
+        <div class="stat-note">{{ delta(change) }} than the {{ periods[period][0]|lower }} before</div>
+      </div>
+      <div class="stat{% if incidents %} stat-flat{% endif %}">
+        <div class="stat-label">Incidents</div>
+        <div class="readout">{{ incidents }}</div>
+        <div class="stat-note">{{ incidents_before }} the {{ periods[period][0]|lower }} before</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Downtime</div>
+        <div class="readout readout-word">{{ down_s|duration if down_s else 'None' }}</div>
+        <div class="stat-note">Every incident, added up</div>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="card-head"><h2>Each Monitor</h2></div>
+      <div class="table-wrap">
+        <table class="fit-table insights-table">
+          <thead><tr><th>Monitor</th><th class="num">Uptime</th><th>Than Before</th><th class="num">Slowest 5%</th><th class="num">Incidents</th><th>Error Budget, {{ budget_days }} Days</th><th class="num">Burn Rate</th></tr></thead>
+          <tbody>
+            {% for row in rows %}
+              {% set p95 = row.now.percentile(95) %}
+              <tr>
+                <td><a class="row-link" href="{{ url_for('monitors.page', monitor_id=row.monitor.id) }}">{{ row.monitor.name }}</a><span class="cell-sub muted small">Goal {{ goal_words(row.monitor.slo_target) }}</span></td>
+                <td class="num" data-label="Uptime">{{ uptime(row.now.ok, row.now.counted) }}</td>
+                <td data-label="Than before">{{ delta(uptime_change(row.now, row.before)) }}</td>
+                <td class="num" data-label="Slowest 5%">{{ ('≈ ' if not row.now.exact else '') ~ (p95|ms) if p95 else '–' }}</td>
+                <td class="num" data-label="Incidents">{{ row.incidents }}</td>
+                <td data-label="Budget">
+                  <svg class="meter" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="{{ (row.budget.used_share * 100)|round|int }}% of the budget used">
+                    <rect class="meter-track" x="0" y="0" width="100" height="8"></rect>
+                    <rect class="meter-fill meter-{{ row.budget.level }}" x="0" y="0" width="{{ '%.1f'|format(row.budget.used_share * 100) }}" height="8"></rect>
+                  </svg>
+                  <span class="small">{% if row.budget.level == 'critical' %}Spent: {{ row.budget.used_s|duration }} used of {{ row.budget.allowed_s|duration }}{% else %}{{ row.budget.left_s|duration }} of {{ row.budget.allowed_s|duration }} left{% endif %}</span>
+                </td>
+                <td class="num" data-label="Burn rate">{% if row.burn is none %}–{% else %}<span title="1 means exactly on budget">{{ '%.1f'|format(row.burn) }}×</span>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <details class="fold">
+        <summary>What these mean</summary>
+        <dl class="facts top-gap-small">
+          <dt>Uptime goal</dt><dd>How reliable a monitor should be (change it on the monitor). 99.9% allows 43 minutes down in {{ budget_days }} days.</dd>
+          <dt>Error budget</dt><dd>That allowance. Failed checks spend it, counted like uptime: 99.95% up in {{ budget_days }} days spends 22 minutes. Almost spent: fix reliability before new risks. Plenty left: room to take some.</dd>
+          <dt>Burn rate</dt><dd>How fast the last 24 hours spent it: 1× is exactly on budget, 10× would spend {{ budget_days }} days' budget in {{ budget_days // 10 }}.</dd>
+          <dt>≈</dt><dd>Read off the hourly and daily summaries, so it may be a little off (within one step of their histogram).</dd>
+        </dl>
+      </details>
+    </section>
+  {% endif %}
+{% endblock %}

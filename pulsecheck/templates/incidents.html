@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, empty, pulse %}
+{% block title %}Incidents - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {{ page_head('Incidents') }}
+
+  <nav aria-label="Which incidents">
+    <ul class="tabs">
+      <li><a href="{{ url_for('incidents.index') }}"{% if tab == 'all' %} aria-current="page"{% endif %}>All</a></li>
+      <li><a href="{{ url_for('incidents.index', tab='open') }}"{% if tab == 'open' %} aria-current="page"{% endif %}>Open <span class="count">{{ open_count }}</span></a></li>
+      <li><a href="{{ url_for('incidents.index', tab='resolved') }}"{% if tab == 'resolved' %} aria-current="page"{% endif %}>Resolved</a></li>
+    </ul>
+  </nav>
+
+  {% if not rows %}
+    {% if tab == 'open' %}
+      {{ empty('Nothing Is Down', 'Every monitor is up, or still being checked again before it counts as down.') }}
+    {% else %}
+      {{ empty('No Incidents Yet', 'An incident opens when a monitor fails several checks in a row, and closes when it is back.') }}
+    {% endif %}
+  {% else %}
+    <div class="table-wrap">
+      <table class="fit-table">
+        <thead><tr><th>Monitor</th><th>Now</th><th>Why</th><th>Started</th><th class="num">How Long</th></tr></thead>
+        <tbody>
+          {% for incident in rows %}
+            <tr>
+              <td><a class="row-link" href="{{ url_for('incidents.page', incident_id=incident.id) }}">{{ incident.monitor.name }}</a></td>
+              <td>{{ pulse(incident_word(incident)) }}</td>
+              <td data-label="Why">{{ error_label(incident.cause) }}</td>
+              <td data-label="Started">{{ incident.opened_at|nice_datetime }}</td>
+              <td class="num" data-label="How long">{{ incident_duration(incident)|duration }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endblock %}

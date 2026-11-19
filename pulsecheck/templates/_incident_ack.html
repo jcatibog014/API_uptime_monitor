@@ -1,0 +1,6 @@
+{% if incident.is_open and not incident.acked_at %}
+  <form method="post" action="{{ url_for('alerts.acknowledge_here', incident_id=incident.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="button" type="submit">I'm on it</button>
+  </form>
+{% endif %}
