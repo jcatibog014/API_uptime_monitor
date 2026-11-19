@@ -131,7 +131,7 @@ Every row has `workspace_id`, and every foreign key has a leading index.
 - [x] Stage 4: metrics
 - [x] Stage 5: alerts
 - [x] Stage 6: smarter checks
-- [ ] Stage 7: alert rules
+- [x] Stage 7: alert rules
 - [ ] Stage 8: status page and incidents
 - [ ] Stage 9: Insights and deploy
 
@@ -143,3 +143,4 @@ Every row has `workspace_id`, and every foreign key has a leading index.
 - Stage 4: rollups keep a histogram as 21 integer columns (b0..b20), not JSON, so SQL can add them up. Day rows are per workspace day (its time zone). The Payments API's practice outages come every 3 days, not every few hours, and the partner fails 6% of answers, not 17%, so 90 days look like a real service. The uptime strip has 3 levels, not 4: the status palette's orange and yellow failed the validator next to each other, and red/green fail for colour-blind readers, so bar height is the second signal.
 - Stage 5: the breaker opens after 5 failures in a row (the plan said "many"). Webhook addresses must be Discord's or Slack's own, so a channel can't be used to reach a private network. Acknowledge is a page with a button, not a link that acts on a visit (mail apps and chat previews open links by themselves).
 - Stage 6: certificate warnings also go out at 1 day. A heartbeat's missed check confirms at once (1 failure, 1 good ping to recover). Speed: the demo's history samples 6 answers an hour and 24 a day, the practice maths is cached, and a replay round takes every monitor due in the next minute (never past the next queued job), so the tests take under two minutes again.
+- Stage 7: flapping is 3 incidents in 30 minutes (the plan said 5 state changes: an incident is 2 changes, and Irregular flickers would count too). A flapper that settles DOWN sends its held down alert instead of "settled".

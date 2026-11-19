@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head, csrf, select %}
+{% block title %}Alert Rules for {{ monitor.name }} - {{ APP_NAME }}{% endblock %}
+{% block content %}
+  {{ page_head('Alert Rules', back=url_for('monitors.page', monitor_id=monitor.id), back_label=monitor.name) }}
+  {% if not channels %}
+    <div class="card form-card">
+      <p>There are no channels yet. <a href="{{ url_for('alerts.index') }}">Add a channel</a> first, then choose here who hears about {{ monitor.name }}.</p>
+    </div>
+  {% else %}
+  <form method="post" class="card form-card stack" novalidate>
+    {{ csrf() }}
+    <fieldset class="stack-small">
+      <legend class="field-label">Alerts about {{ monitor.name }} go to</legend>
+      <p class="field-note">Choose none, and every channel gets them.</p>
+      {% for channel in channels %}
+        <label class="check"><input type="checkbox" name="channel" value="{{ channel.id }}"{% if routing.get(channel.id) == 1 %} checked{% endif %}> <span>{{ channel.name }} <span class="muted small">{{ channel_kind(channel.kind) }}{% if not channel.enabled %}, paused{% endif %}</span></span></label>
+      {% endfor %}
+    </fieldset>
+    {{ select('remind_every_m', 'Remind while it is down', reminds, form.get('remind_every_m', monitor.remind_every_m or ''), errors.remind_every_m, hint='Until someone says they are on it') }}
+    {{ select('escalate_after_m', 'Escalate', escalates, form.get('escalate_after_m', monitor.escalate_after_m or ''), errors.escalate_after_m, hint='If nobody is on it by then') }}
+    <fieldset class="stack-small{% if errors.escalate_to %} has-error{% endif %}">
+      <legend class="field-label">The escalation goes to</legend>
+      {% for channel in channels %}
+        <label class="check"><input type="checkbox" name="escalate_to" value="{{ channel.id }}"{% if routing.get(channel.id) == 2 %} checked{% endif %}> <span>{{ channel.name }} <span class="muted small">{{ channel_kind(channel.kind) }}</span></span></label>
+      {% endfor %}
+      {% if errors.escalate_to %}<p class="field-error">{{ errors.escalate_to }}</p>{% endif %}
+    </fieldset>
+    <p class="field-note">A monitor that keeps going down and coming back (3 times in 30 minutes) is flapping: it sends one alert about that, and holds the rest until it settles for 15 minutes.</p>
+    <div class="form-actions">
+      <a class="button button-quiet" href="{{ url_for('monitors.page', monitor_id=monitor.id) }}">Cancel</a>
+      <button class="button" type="submit">Save alert rules</button>
+    </div>
+  </form>
+  {% endif %}
+{% endblock %}

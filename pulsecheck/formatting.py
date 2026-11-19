@@ -113,6 +113,10 @@ def duration(seconds):
     return f"{days} d {hours} h" if hours else f"{days} d"
 
 
+def duration_minutes(minutes):
+    return duration((minutes or 0) * 60)
+
+
 def plural(count, word, many=None):
     """1 check, 3 checks (with thousands commas)."""
     return f"{count:,} {word if count == 1 else many or word + 's'}"
@@ -161,7 +165,7 @@ def uptime(part, whole):
 
 
 def init_app(app):
-    for function in (nice_date, short_date, clock, nice_datetime, check_time, ago, from_now, duration, number, iso_local,
+    for function in (nice_date, short_date, clock, nice_datetime, check_time, ago, duration_minutes, from_now, duration, number, iso_local,
                      day_iso, ms):
         app.jinja_env.filters[function.__name__] = function
     app.jinja_env.globals.update(plural=plural, percent=percent, uptime=uptime)

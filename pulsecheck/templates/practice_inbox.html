@@ -8,7 +8,7 @@
     <p class="muted small inbox-note">Alerts to practice channels land here, drawn the way each service would show them. Nothing left Pulse Check.</p>
     <div class="inbox">
       {% for message in rows %}
-        <article class="message look-{{ message.looks_like }}{% if message.title.endswith(' is down') %} is-down{% elif message.title.endswith(' back up') %} is-up{% endif %}">
+        <article class="message look-{{ message.looks_like }}{% if message.title.endswith((' is down', 'still down', 'nobody is on it')) %} is-down{% elif message.title.endswith((' back up', ' has settled')) %} is-up{% elif message.title.endswith(' is flapping') %} is-flapping{% endif %}">
           <header class="message-head">
             <span class="message-app">{% if message.looks_like == 'email' %}Email{% elif message.looks_like == 'discord' %}Discord{% elif message.looks_like == 'telegram' %}Telegram{% else %}Phone notification{% endif %} · {{ message.channel_name }}</span>
             <time class="message-time">{{ message.at|check_time }}</time>

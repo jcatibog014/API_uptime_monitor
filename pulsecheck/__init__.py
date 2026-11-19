@@ -117,7 +117,8 @@ def create_app(test_config=None):
         # Without it we'd use a SQLite file, and Render forgets files on every restart.
         raise RuntimeError("Set the DATABASE_URL environment variable on Render (Supabase's connection string).")
 
-    from . import (alerts, auth, canary, certificates, db, formatting, heartbeat, history, incidents,  # noqa: F401
+    from . import (alert_rules, alerts, auth, canary, certificates, db, formatting, heartbeat, history,  # noqa: F401
+                   incidents,
                    pulse_words, rollups, rules, scheduler, seed, tick, worker)
     from .views import alerts as alert_views
     from .views import crew, dashboard, demo, monitors, numbers, settings
@@ -143,6 +144,7 @@ def create_app(test_config=None):
     alert_views.init_app(app)
     certificates.init_app(app)
     heartbeat.init_app(app)
+    alert_rules.init_app(app)
     # auth comes first: its before_request (load_user) must run before the others'.
     for blueprint in (auth.bp, dashboard.bp, monitors.bp, incident_views.bp, alert_views.bp, crew.bp, settings.bp, demo.bp,
                       tick.bp, heartbeat.bp):

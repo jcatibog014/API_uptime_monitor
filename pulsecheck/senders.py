@@ -38,7 +38,7 @@ DISCORD = re.compile(r"https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/web
 SLACK = re.compile(r"https://hooks\.slack\.com/(?:services|workflows|triggers)/[\w/-]+")
 TELEGRAM_TOKEN = re.compile(r"\d{5,}:[\w-]{30,}")
 PRACTICE_BUSY = 0.15  # a practice channel says "too many requests" this often, so retries show
-RED, GREEN, GREY = 0xDC2626, 0x10B981, 0x6B7280
+RED, GREEN, AMBER, GREY = 0xDC2626, 0x10B981, 0xF59E0B, 0x6B7280
 
 
 @dataclass
@@ -109,7 +109,8 @@ def text_of(alert):
 
 
 def colour(alert):
-    return {"down": RED, "up": GREEN}.get(alert.event, GREY)
+    return {"down": RED, "reminder": RED, "escalation": RED, "up": GREEN, "settled": GREEN,
+            "flapping": AMBER}.get(alert.event, GREY)
 
 
 def send_discord(s, channel, alert, secrets, now):

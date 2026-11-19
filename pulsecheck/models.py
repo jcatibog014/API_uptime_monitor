@@ -123,6 +123,12 @@ class Monitor(Base):
     cert_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
     cert_issuer: Mapped[str] = mapped_column(String(120), default="", server_default="")
     cert_warned_days: Mapped[int | None] = mapped_column(Integer)
+    # Alert rules (stage 7, alert_rules.py): remind every N minutes while down and nobody is on it,
+    # escalate to the second set of channels after M minutes; flapping holds alerts back.
+    remind_every_m: Mapped[int | None] = mapped_column(Integer)
+    escalate_after_m: Mapped[int | None] = mapped_column(Integer)
+    flapping: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    flapping_since: Mapped[datetime | None] = mapped_column(DateTime)
 
     workspace: Mapped[Workspace] = relationship()
 
@@ -238,6 +244,8 @@ class Incident(Base):
     # Someone said "I'm on it" (the Acknowledge link in an alert, or the button): reminders stop.
     acked_at: Mapped[datetime | None] = mapped_column(DateTime)
     acked_by: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    reminders_sent: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     monitor: Mapped[Monitor] = relationship()
 
@@ -386,3 +394,14 @@ class PushSubscription(Base):
     p256dh: Mapped[str] = mapped_column(String(200))
     auth: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class MonitorChannel(Base):
+    """Which channels hear about a monitor (alert_rules.py). level 1: every alert; level 2: only
+    the escalation, when nobody has said "I'm on it" in time. A monitor with no level-1 rows
+    alerts every channel (the simple start)."""
+    __tablename__ = "monitor_channels"
+
+    monitor_id: Mapped[int] = mapped_column(ForeignKey("monitors.id", ondelete="CASCADE"), primary_key=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("channels.id", ondelete="CASCADE"), primary_key=True, index=True)
+    level: Mapped[int] = mapped_column(Integer, default=1, server_default="1")

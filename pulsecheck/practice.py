@@ -93,6 +93,10 @@ def in_outage(key, service, params, moment):
         start = datetime.fromisoformat(params["down"])
         if start <= moment < start + timedelta(minutes=int(params.get("for", "30"))):
             return True
+    if "flap" in params:  # down 3 minutes, up 3 minutes, over and over, for a while
+        start = datetime.fromisoformat(params["flap"])
+        if start <= moment < start + timedelta(minutes=int(params.get("flap_for", "40"))):
+            return (moment - start).total_seconds() // 60 % 6 < 3
     if not service.outage_every:
         return False
     minutes = int((moment - UNIX_START).total_seconds() // 60)  # naive UTC: not .timestamp(), which assumes local time

@@ -277,6 +277,7 @@ html:not(.js) .js-only { display: none !important; }
 .split { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr); align-items: start; }
 @media (max-width: 64rem) { .split { grid-template-columns: 1fr; } }
 .top-gap { margin-top: 1.25rem; }
+.top-gap-small { margin-top: .5rem; }
 
 /* Stat boxes: a readout and what it counts. */
 .stats { display: grid; gap: .75rem 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); margin-bottom: 1.4rem; }
@@ -483,6 +484,7 @@ tbody tr:hover { background: var(--row-hover); }
 .look-discord { border-left: 4px solid var(--pulse-quiet-lamp); }
 .look-discord.is-down { border-left-color: var(--status-critical); }
 .look-discord.is-up { border-left-color: var(--status-good); }
+.look-discord.is-flapping { border-left-color: var(--status-warning); }
 .look-telegram { border-radius: 16px 16px 16px 4px; background: color-mix(in srgb, var(--chart-1) 8%, var(--surface)); }
 .look-push { border-radius: 18px; box-shadow: 0 6px 20px rgb(0 0 0 / .14); }
 .look-email .message-title { font-size: 1.05rem; }

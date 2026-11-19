@@ -29,6 +29,12 @@
     <span class="address">{% if monitor.kind == 'http' %}{{ monitor.method }} {% endif %}{{ monitor_address(monitor) }}</span>
   </div>
 
+  {% if monitor.flapping %}
+    <div class="banner banner-warn" role="status">
+      <div><strong>Flapping since {{ monitor.flapping_since|check_time }}</strong>It keeps going down and coming back. Its down and up alerts are held until it stays one way for 15 minutes.</div>
+    </div>
+  {% endif %}
+
   {% if monitor.kind == 'heartbeat' and monitor.heartbeat_token %}
     <section class="card ping-card">
       <div class="card-head"><h2>Its Address</h2></div>
@@ -120,6 +126,13 @@
         <dt>Up again after</dt><dd>{{ plural(monitor.recover_tries, 'good check') }} in a row</dd>
         {% for template_name in monitor_facts|default([]) %}{% include template_name %}{% endfor %}
       </dl>
+      <h3 class="top-gap" id="alert-rules">Alert Rules</h3>
+      <dl class="facts top-gap-small">
+        <dt>Alerts go to</dt><dd>{% if alert_channels %}{{ alert_channels|map(attribute='name')|join(', ') }}{% elif channels_chosen %}Only paused channels{% else %}No channels yet{% endif %}{% if not channels_chosen and alert_channels %} <span class="muted small">(every channel)</span>{% endif %}</dd>
+        <dt>Reminders</dt><dd>{{ ('Every ' ~ (monitor.remind_every_m|duration_minutes)) if monitor.remind_every_m else 'None' }}</dd>
+        <dt>Escalation</dt><dd>{% if monitor.escalate_after_m %}To {{ escalation_channels|map(attribute='name')|join(', ') or 'nobody' }} after {{ monitor.escalate_after_m }} minutes{% else %}None{% endif %}</dd>
+      </dl>
+      <a class="button button-quiet button-small top-gap" href="{{ url_for('monitors.alert_settings', monitor_id=monitor.id) }}">{{ icon('alerts', 16) }} Change alert rules</a>
       <form method="post" action="{{ url_for('monitors.delete', monitor_id=monitor.id) }}" class="top-gap"
             data-confirm="Delete {{ monitor.name }} and all its checks? This can't be undone.">
         {{ csrf() }}

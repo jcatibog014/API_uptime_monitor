@@ -38,7 +38,8 @@ SHIPPING_DOWN_FOR = 55  # minutes
 # The Payments API's outages come every few hours (practice.py); one is set inside the replayed
 # hours too, so every demo has an incident that is already over.
 PAYMENTS_DOWN_BEFORE = timedelta(minutes=105)
-CERT_LEFT = timedelta(days=9, hours=6)  # the Images CDN's certificate: a warning at 14 days goes out
+CERT_LEFT = timedelta(days=9, hours=6)
+PARTNER_FLAPS_BEFORE = timedelta(minutes=80)  # it flaps for 30 minutes, then settles while the replay goes on  # the Images CDN's certificate: a warning at 14 days goes out
 # (name, practice service, how often in seconds)
 MONITORS = [
     ("Website", "website", 60),
@@ -83,6 +84,9 @@ def build(s, now):
         if service == "shipping-api":
             down = (now - SHIPPING_DOWN_BEFORE).replace(second=0, microsecond=0)
             params = {"down": down.isoformat(timespec="minutes"), "for": SHIPPING_DOWN_FOR}
+        elif service == "partner-api":
+            flap = (now - PARTNER_FLAPS_BEFORE).replace(second=0, microsecond=0)
+            params = {"flap": flap.isoformat(timespec="minutes"), "flap_for": 30}
         elif service == "images-cdn":
             params = {"cert": (now + CERT_LEFT).isoformat(timespec="minutes")}
         elif service == "payments-api":

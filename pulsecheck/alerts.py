@@ -46,9 +46,16 @@ def ack_link(incident):
     return site(f"/ack/{tokens.make('ack', incident.id)}")
 
 
+# Words for events that later modules add: event -> function(event, monitor, incident, now) -> (title, body).
+extra_words = {}
+
+
 def compose(event, monitor, incident, workspace, now):
     """(title, body, link) of an alert, in plain words."""
     zone_name = workspace.time_zone
+    if event in extra_words:
+        title, body = extra_words[event](event, monitor, incident, now)
+        return title, body, site(f"/incidents/{incident.id}")
     from .pulse_words import error_label
     if event == "down":
         return (f"{monitor.name} is down",

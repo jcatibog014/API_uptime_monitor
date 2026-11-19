@@ -1,7 +1,10 @@
 """Monitor pages: the list, add, change, delete, one monitor's page, and Check now."""
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
-from .. import checking, db, heartbeat, incidents, limits, monitors, practice, probe, scheduler, worker
+from sqlalchemy import func, select
+
+from .. import alert_rules, checking, db, heartbeat, incidents, limits, monitors, practice, probe, scheduler, worker
+from ..models import Channel, MonitorChannel
 from ..auth import login_required
 from ..dates import utcnow
 
@@ -120,6 +123,48 @@ def pause(monitor_id):
     return redirect(url_for("monitors.page", monitor_id=monitor.id))
 
 
+@bp.route("/<int:monitor_id>/alerts", methods=["GET", "POST"])
+@login_required
+def alert_settings(monitor_id):
+    """Who hears about this monitor, reminders and escalation (alert_rules.py)."""
+    s = db.session()
+    monitor = monitors.get(s, monitor_id)
+    channels = s.scalars(select(Channel).where(Channel.workspace_id == g.workspace.id).order_by(Channel.id)).all()
+    routing = {row.channel_id: row.level for row in s.scalars(select(MonitorChannel).where(
+        MonitorChannel.monitor_id == monitor.id))}
+    errors = {}
+    if request.method == "POST":
+        ids = {channel.id for channel in channels}
+        level_1 = [int(value) for value in request.form.getlist("channel") if value.isdigit() and int(value) in ids]
+        level_2 = [int(value) for value in request.form.getlist("escalate_to") if value.isdigit() and int(value) in ids]
+        remind = _number(request.form.get("remind_every_m"), alert_rules.REMIND_CHOICES)
+        escalate = _number(request.form.get("escalate_after_m"), alert_rules.ESCALATE_CHOICES)
+        if escalate and not [channel_id for channel_id in level_2 if channel_id not in level_1]:
+            errors["escalate_to"] = "Choose who gets the escalation (someone who doesn't get the first alerts)."
+        if not errors:
+            alert_rules.set_routing(s, monitor, level_1, level_2)
+            monitor.remind_every_m, monitor.escalate_after_m = remind, escalate
+            s.commit()
+            flash("The alert rules are saved.")
+            return redirect(url_for("monitors.page", monitor_id=monitor.id, _anchor="alert-rules"))
+        routing = {**{channel_id: 2 for channel_id in level_2}, **{channel_id: 1 for channel_id in level_1}}
+    return render_template("alert_rules.html", monitor=monitor, channels=channels, routing=routing, errors=errors,
+                           form=request.form, reminds=alert_rules.REMIND_CHOICES,
+                           escalates=alert_rules.ESCALATE_CHOICES), 400 if errors else 200
+
+
+def _number(value, choices):
+    return int(value) if value and value.isdigit() and int(value) in dict(choices) else None
+
+
+def rule_extras(s, monitor):
+    channels = alert_rules.channels_for(s, monitor)
+    second = alert_rules.channels_for(s, monitor, level=2)
+    chosen = s.scalar(select(func.count()).select_from(MonitorChannel).where(MonitorChannel.monitor_id == monitor.id,
+                                                                            MonitorChannel.level == 1))
+    return {"alert_channels": channels, "escalation_channels": second, "channels_chosen": bool(chosen)}
+
+
 @bp.post("/<int:monitor_id>/ping")
 @login_required
 def test_ping(monitor_id):
@@ -168,6 +213,8 @@ def init_app(app):
         monitor.interval_s, monitors.interval_words(monitor.interval_s))
     if cert_extras not in page_extras:
         page_extras.append(cert_extras)
+    if rule_extras not in page_extras:
+        page_extras.append(rule_extras)
 
 
 def address(monitor):
