@@ -21,7 +21,14 @@ MAX_MONITORS = 25
 
 
 def interval_words(seconds):
-    return dict(INTERVALS).get(seconds, f"Every {seconds} s")
+    """Every minute, Every 6 hours, Every day: never "Every 86400 s"."""
+    if seconds in dict(INTERVALS):
+        return dict(INTERVALS)[seconds]
+    for size, one, many in ((86400, "day", "days"), (3600, "hour", "hours"), (60, "minute", "minutes")):
+        if seconds % size == 0:
+            count = seconds // size
+            return f"Every {one}" if count == 1 else f"Every {count} {many}"
+    return f"Every {seconds} seconds"
 
 
 def get(s, monitor_id):

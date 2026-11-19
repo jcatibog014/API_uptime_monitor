@@ -324,3 +324,20 @@ def test_the_demo_has_practice_channels_and_an_inbox(app):
     assert "Discord · Discord #ops" in page and "Phone notification" in page
     assert "Retrying" in words(client.get("/alerts/sent")) or "Sent" in words(client.get("/alerts/sent"))
     assert post(client, "/alerts/new/discord", {"name": "x", "url": DISCORD_URL}).status_code == 403
+
+
+def test_retrying_soon_shows_only_when_the_breaker_is_open(app, owner):
+    client, workspace_id = owner
+    channel_id = add_channel(app, workspace_id)
+    with app.app_context():
+        s = db.session()
+        channel = s.get(Channel, channel_id)
+        channel.paused_until, channel.fail_streak = utcnow() + timedelta(minutes=1), 1  # a 429's short wait
+        s.commit()
+    assert "Retrying Soon" not in words(client.get("/alerts"))
+    with app.app_context():
+        s = db.session()
+        s.get(Channel, channel_id).fail_streak = alerts.BREAKER_AFTER
+        s.commit()
+    page = words(client.get("/alerts"))
+    assert "Retrying Soon" in page and "Resting" not in page

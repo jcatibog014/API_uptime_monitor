@@ -45,7 +45,7 @@
       <div class="card-head"><h2>Each Monitor</h2></div>
       <div class="table-wrap">
         <table class="fit-table insights-table">
-          <thead><tr><th>Monitor</th><th class="num">Uptime</th><th>Than Before</th><th class="num">Slowest 5%</th><th class="num">Incidents</th><th>Error Budget, {{ budget_days }} Days</th><th class="num">Burn Rate</th></tr></thead>
+          <thead><tr><th>Monitor</th><th class="num">Uptime</th><th>Than Before</th><th class="num">Slowest 5%</th><th class="num">Incidents</th><th>Allowed Downtime, {{ budget_days }} Days</th><th class="num">Burn Rate</th></tr></thead>
           <tbody>
             {% for row in rows %}
               {% set p95 = row.now.percentile(95) %}
@@ -56,9 +56,10 @@
                 <td class="num" data-label="Slowest 5%">{{ ('≈ ' if not row.now.exact else '') ~ (p95|ms) if p95 else '–' }}</td>
                 <td class="num" data-label="Incidents">{{ row.incidents }}</td>
                 <td data-label="Budget">
-                  <svg class="meter" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="{{ (row.budget.used_share * 100)|round|int }}% of the budget used">
+                  {% set left_share = 1 if row.budget.level == 'critical' else 1 - row.budget.used_share %}
+                  <svg class="meter" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="{{ ((1 - row.budget.used_share) * 100)|round|int }}% of the allowed downtime left">
                     <rect class="meter-track" x="0" y="0" width="100" height="8"></rect>
-                    <rect class="meter-fill meter-{{ row.budget.level }}" x="0" y="0" width="{{ '%.1f'|format(row.budget.used_share * 100) }}" height="8"></rect>
+                    <rect class="meter-fill meter-{{ row.budget.level }}" x="0" y="0" width="{{ '%.1f'|format(left_share * 100) }}" height="8"></rect>
                   </svg>
                   <span class="small">{% if row.budget.level == 'critical' %}Spent: {{ row.budget.used_s|duration }} used of {{ row.budget.allowed_s|duration }}{% else %}{{ row.budget.left_s|duration }} of {{ row.budget.allowed_s|duration }} left{% endif %}</span>
                 </td>
@@ -72,8 +73,8 @@
         <summary>What these mean</summary>
         <dl class="facts top-gap-small">
           <dt>Uptime goal</dt><dd>How reliable a monitor should be (change it on the monitor). 99.9% allows 43 minutes down in {{ budget_days }} days.</dd>
-          <dt>Error budget</dt><dd>That allowance. Failed checks spend it, counted like uptime: 99.95% up in {{ budget_days }} days spends 22 minutes. Almost spent: fix reliability before new risks. Plenty left: room to take some.</dd>
-          <dt>Burn rate</dt><dd>How fast the last 24 hours spent it: 1× is exactly on budget, 10× would spend {{ budget_days }} days' budget in {{ budget_days // 10 }}.</dd>
+          <dt>Allowed downtime</dt><dd>That allowance (engineers call it an error budget). Failed checks spend it, counted like uptime: 99.95% up in {{ budget_days }} days spends 22 minutes. The bar shows what is left: green, amber under half, red when it is all spent.</dd>
+          <dt>Burn rate</dt><dd>How fast the last 24 hours spent it: 1× is exactly on pace, 10× would spend {{ budget_days }} days' allowance in {{ budget_days // 10 }}.</dd>
           <dt>≈</dt><dd>Read off the hourly and daily summaries, so it may be a little off (within one step of their histogram).</dd>
         </dl>
       </details>

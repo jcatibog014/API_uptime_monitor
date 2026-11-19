@@ -16,7 +16,7 @@
               <span class="channel-kind kind-{{ channel.kind }}">{{ channel_kind(channel.kind) }}</span>
               <h3>{{ channel.name }}</h3>
               {% if not channel.enabled %}{{ pulse(pulse_state('paused')) }}
-              {% elif channel.paused_until and channel.paused_until > now() %}<span class="pulse pulse-weak" title="After {{ channel.fail_streak }} failures in a row, it rests before trying again.">Resting<span class="visually-hidden">: after failures in a row, it rests before trying again</span></span>
+              {% elif channel.paused_until and channel.paused_until > now() and channel.fail_streak >= breaker_after %}<span class="pulse pulse-weak" title="After {{ channel.fail_streak }} failures in a row, it waits until {{ channel.paused_until|clock }} before trying again.">Retrying Soon<span class="visually-hidden">: after failures in a row, it waits a few minutes before trying again</span></span>
               {% endif %}
             </div>
             <p class="muted small">
@@ -41,7 +41,9 @@
     {% endif %}
   </section>
 
-  {% if room > 0 %}
+  {% if g.workspace.is_demo %}
+    <p class="muted small top-gap" id="add">The demo's alerts go to the Practice Inbox, never a real service.{% if room > 0 %} <a href="{{ url_for('alerts.new', kind='practice') }}">Add another practice channel</a>{% endif %}</p>
+  {% elif room > 0 %}
   <section class="section" id="add">
     <div class="card-head"><h2>Add a Channel</h2></div>
     <div class="grid grid-3">
@@ -58,7 +60,6 @@
         </div>
       {% endfor %}
     </div>
-    {% if g.workspace.is_demo %}<p class="muted small top-gap">The demo's alerts go to the Practice Inbox, never a real service.</p>{% endif %}
   </section>
   {% endif %}
 

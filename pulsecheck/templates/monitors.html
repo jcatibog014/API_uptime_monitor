@@ -15,7 +15,7 @@
     <div class="table-wrap">
       <table class="fit-table">
         <thead>
-          <tr><th>Monitor</th><th>Now</th><th class="num">Response</th><th>Checked</th><th>How Often</th></tr>
+          <tr><th>Monitor</th><th>Now</th><th class="num">Response</th><th>Checked</th><th>How Often</th><th><span class="visually-hidden">Pause or resume</span></th></tr>
         </thead>
         <tbody>
           {% for monitor, last in rows %}
@@ -28,6 +28,12 @@
               <td class="num" data-label="Response">{% if last and last.ok %}{{ last.total_ms|ms }}{% else %}–{% endif %}</td>
               <td data-label="Checked">{% if last %}{{ last.started_at|ago }}{% else %}Not yet{% endif %}</td>
               <td data-label="How often">{{ monitor_interval(monitor) }}</td>
+              <td class="row-actions">
+                <form method="post" action="{{ url_for('monitors.pause', monitor_id=monitor.id, back='list') }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="icon-button icon-button-small" type="submit" title="{{ ('Resume checks on ' if monitor.paused else 'Pause checks on ') ~ monitor.name }}" aria-label="{{ ('Resume checks on ' if monitor.paused else 'Pause checks on ') ~ monitor.name }}">{{ icon('play' if monitor.paused else 'pause', 16) }}</button>
+                </form>
+              </td>
             </tr>
           {% endfor %}
         </tbody>

@@ -122,6 +122,8 @@ def pause(monitor_id):
     changed(s, monitor, utcnow())
     flash(f"{monitor.name} is paused. It isn't checked until you resume it." if monitor.paused
           else f"{monitor.name} is checked again, starting now.")
+    if request.args.get("back") == "list":  # the pause button on the Monitors list
+        return redirect(url_for("monitors.index"))
     return redirect(url_for("monitors.page", monitor_id=monitor.id))
 
 

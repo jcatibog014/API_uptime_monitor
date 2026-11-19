@@ -10,6 +10,7 @@
       <p class="muted small">{{ 'The next one goes out on Monday at 8 AM.' if g.workspace.weekly_report else 'No report is sent.' }}</p>
     </div>
     <input type="hidden" name="weekly_report" value="{{ '0' if g.workspace.weekly_report else '1' }}">
-    <button class="button button-quiet" type="submit">{{ 'Turn off' if g.workspace.weekly_report else 'Turn on' }}</button>
+    <button class="switch" type="submit" role="switch" aria-checked="{{ 'true' if g.workspace.weekly_report else 'false' }}"
+            aria-label="Weekly report" title="{{ 'Turn off' if g.workspace.weekly_report else 'Turn on' }}"></button>
   </form>
 </section>

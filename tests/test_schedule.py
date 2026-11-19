@@ -288,3 +288,26 @@ def test_the_crew_page_lists_gaps(app, owner, site):
         scheduler.run_due(db.session(), NINE + timedelta(minutes=30))
     page = words(client.get("/crew"))
     assert "Payments API" in page and "Checks Skipped" in page and "uptime leaves these minutes out" in page
+
+
+def test_a_worker_is_quiet_then_stopped_and_an_empty_crew_raises_the_alarm(app, owner):
+    from pulsecheck.views.crew import worker_state
+    from pulsecheck.models import Worker
+    now = utcnow()
+    def state(minutes_ago):
+        return worker_state(Worker(id="w", kind="in the web app", started_at=now,
+                                   last_seen=now - timedelta(minutes=minutes_ago)), now)
+    # Idle workers write a heartbeat at least every 5 minutes, so 5 minutes is still on duty.
+    assert (state(1), state(5), state(7), state(20)) == ("on", "on", "quiet", "off")
+    client, _ = owner
+    with app.app_context():
+        s = db.session()
+        worker.register(s, "web-1-ab", "in the web app", now - timedelta(minutes=20))
+        s.commit()
+    page = words(client.get("/crew"))
+    assert "No worker is on duty" in page and "1 worker from earlier" in page and "Web app worker 1" not in page
+    with app.app_context():
+        s = db.session()
+        worker.register(s, "web-2-cd", "in the web app", now)
+        s.commit()
+    assert "No worker is on duty" not in words(client.get("/crew"))

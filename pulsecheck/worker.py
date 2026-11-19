@@ -45,7 +45,9 @@ POLL_MIN = 0.5  # seconds: never spin faster than this
 IDLE_MAX = 5 * 60  # seconds: sleep at most this long with nothing to do
 JOBS_PER_ROUND = 3  # few at a time, so the other threads get their share of slow checks
 CREW_SIZE = 4  # worker threads in the web app
-QUIET_AFTER = timedelta(minutes=2)  # a worker silent this long is shown as gone quiet
+# A worker with nothing to do sleeps up to IDLE_MAX between heartbeats, so "quiet" must be longer.
+QUIET_AFTER = timedelta(minutes=6)  # silent this long: shown as gone quiet
+STOPPED_AFTER = timedelta(minutes=15)  # silent this long: it has stopped (the app restarted, the window closed)
 
 
 def worker_name(kind):

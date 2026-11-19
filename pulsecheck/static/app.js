@@ -267,7 +267,54 @@ function setUpPushButton() {
   });
 }
 
+// Rows that can be dragged into order (a status page's monitors). Each row's hidden "position"
+// box gets its new place; the arrow keys on a row's handle move it too. Without JavaScript the
+// number boxes show instead.
+function setUpSortable() {
+  document.querySelectorAll("[data-sortable]").forEach((body) => {
+    const renumber = () => body.querySelectorAll("tr").forEach((row, index) => {
+      const box = row.querySelector("[data-position]");
+      if (box) box.value = index;
+    });
+    let dragged = null;
+    body.addEventListener("dragstart", (event) => {
+      dragged = event.target.closest("tr");
+      if (!dragged) return;
+      dragged.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+    });
+    body.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      const over = event.target.closest("tr");
+      if (!dragged || !over || over === dragged) return;
+      const box = over.getBoundingClientRect();
+      over.parentNode.insertBefore(dragged, event.clientY > box.top + box.height / 2 ? over.nextSibling : over);
+    });
+    body.addEventListener("dragend", () => {
+      if (dragged) dragged.classList.remove("is-dragging");
+      dragged = null;
+      renumber();
+    });
+    body.querySelectorAll("[data-drag-handle]").forEach((handle) => {
+      handle.addEventListener("keydown", (event) => {
+        const row = handle.closest("tr");
+        if (event.key === "ArrowUp" && row.previousElementSibling) {
+          row.parentNode.insertBefore(row, row.previousElementSibling);
+        } else if (event.key === "ArrowDown" && row.nextElementSibling) {
+          row.parentNode.insertBefore(row.nextElementSibling, row);
+        } else {
+          return;
+        }
+        event.preventDefault();
+        handle.focus();
+        renumber();
+      });
+    });
+    renumber();
+  });
+}
+
 // Startup: every part looks for its own elements and does nothing if they aren't on the page.
 const setUps = [setUpToasts, setUpWatchChanges, setUpInstall, setUpTheme, setUpMenu, setUpPopovers,
-  setUpConfirm, setUpAutoSubmit, setUpCopy, setUpReplayWatch, setUpPushButton];
+  setUpConfirm, setUpAutoSubmit, setUpCopy, setUpReplayWatch, setUpPushButton, setUpSortable];
 document.addEventListener("DOMContentLoaded", () => setUps.forEach((setUp) => setUp()));

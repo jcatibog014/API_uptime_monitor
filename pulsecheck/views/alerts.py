@@ -49,7 +49,7 @@ def index():
     kinds = ["practice"] if g.workspace.is_demo else list(KINDS)
     devices = s.scalars(select(PushSubscription).where(PushSubscription.workspace_id == g.workspace.id)).all()
     return render_template("alerts.html", channels=channels, kinds=kinds, kind_words=KINDS, ready=kind_ready,
-                           devices=devices, room=MAX_CHANNELS - len(channels),
+                           devices=devices, room=MAX_CHANNELS - len(channels), breaker_after=alerts.BREAKER_AFTER,
                            looks={"email": "an email", "discord": "a Discord message", "telegram": "a Telegram message",
                                   "push": "a phone notification"})
 

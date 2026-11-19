@@ -76,6 +76,10 @@ Show the people who use your services if they work, with your notes during an in
 
 ![A status page](docs/screenshots/status-page.png)
 
+Choose its address and which monitors it shows. Drag the rows to set their order.
+
+![Changing a status page](docs/screenshots/status-page-form.png)
+
 Plan **maintenance**: during the work, monitors rest. No alerts, and it doesn't count against uptime.
 
 ![Maintenance](docs/screenshots/maintenance.png)

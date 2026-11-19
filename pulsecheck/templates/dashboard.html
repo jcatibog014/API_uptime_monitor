@@ -10,7 +10,7 @@
   {% if g.workspace.replaying %}
     <div class="banner banner-quiet" role="status" data-replay-url="{{ url_for('demo.replay_status') }}">
       <span class="spinner" aria-hidden="true"></span>
-      <div><strong>Getting your demo ready</strong>Its past 3 hours of checks are being replayed. This page reloads by itself in a few seconds.</div>
+      <div><strong>Getting your demo ready</strong>Replaying the last 3 hours of checks. This page will refresh automatically.</div>
     </div>
   {% endif %}
   {% for template_name in dashboard_banners|default([]) %}{% include template_name %}{% endfor %}

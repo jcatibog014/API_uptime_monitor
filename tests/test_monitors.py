@@ -1,4 +1,5 @@
 """Monitor pages: add, change, delete, one monitor's page, and Check now."""
+import pytest
 from sqlalchemy import func, select
 
 from pulsecheck import db, monitors
@@ -151,3 +152,29 @@ def test_a_check_run_twice_is_recorded_once(app, owner, site):
 
 def test_logged_out_visitors_see_no_monitors(app):
     assert browser(app).get("/monitors").status_code == 302
+
+
+@pytest.mark.parametrize("seconds, said", [
+    (60, "Every minute"), (300, "Every 5 minutes"), (3600, "Every hour"), (21600, "Every 6 hours"),
+    (86400, "Every day"), (172800, "Every 2 days"), (90, "Every 90 seconds")])
+def test_how_often_is_said_in_words(seconds, said):
+    assert monitors.interval_words(seconds) == said
+
+
+def test_a_heartbeat_says_every_day_not_seconds(app, owner):
+    client, workspace_id = owner
+    make_monitor(app, workspace_id, name="Nightly backup", kind="heartbeat", url="", interval_s=86400)
+    page = words(client.get("/monitors"))
+    assert "Every day" in page and "86400" not in page
+
+
+def test_pause_and_resume_from_the_list(app, owner):
+    client, workspace_id = owner
+    monitor_id = make_monitor(app, workspace_id)
+    assert "Pause checks on Payments API" in text(client.get("/monitors"))
+    response = post(client, f"/monitors/{monitor_id}/pause?back=list")
+    assert response.status_code == 302 and response.headers["Location"].endswith("/monitors")
+    assert saved(app, monitor_id).paused
+    assert "Resume checks on Payments API" in text(client.get("/monitors"))
+    post(client, f"/monitors/{monitor_id}/pause?back=list")
+    assert not saved(app, monitor_id).paused

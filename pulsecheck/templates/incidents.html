@@ -1,6 +1,28 @@
 {% extends "base.html" %}
 {% from "_macros.html" import page_head, empty, pulse %}
 {% block title %}Incidents - {{ APP_NAME }}{% endblock %}
+{% macro incident_table(rows, with_monitor=True) %}
+  <div class="table-wrap">
+    <table class="fit-table">
+      <thead><tr>{% if with_monitor %}<th>Monitor</th>{% endif %}<th>{{ 'Started' if not with_monitor else 'Now' }}</th><th>Why</th>{% if with_monitor %}<th>Started</th>{% endif %}<th class="num">How Long</th></tr></thead>
+      <tbody>
+        {% for incident in rows %}
+          <tr>
+            {% if with_monitor %}
+              <td><a class="row-link" href="{{ url_for('incidents.page', incident_id=incident.id) }}">{{ incident.monitor.name }}</a></td>
+              <td>{{ pulse(incident_word(incident)) }}</td>
+            {% else %}
+              <td><a class="row-link" href="{{ url_for('incidents.page', incident_id=incident.id) }}">{{ incident.opened_at|nice_datetime }}</a></td>
+            {% endif %}
+            <td data-label="Why">{{ error_label(incident.cause) }}</td>
+            {% if with_monitor %}<td data-label="Started">{{ incident.opened_at|nice_datetime }}</td>{% endif %}
+            <td class="num" data-label="How long">{{ incident_duration(incident)|duration }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endmacro %}
 {% block content %}
   {{ page_head('Incidents') }}
 
@@ -19,21 +41,27 @@
       {{ empty('No Incidents Yet', 'An incident opens when a monitor fails several checks in a row, and closes when it is back.') }}
     {% endif %}
   {% else %}
-    <div class="table-wrap">
-      <table class="fit-table">
-        <thead><tr><th>Monitor</th><th>Now</th><th>Why</th><th>Started</th><th class="num">How Long</th></tr></thead>
-        <tbody>
-          {% for incident in rows %}
-            <tr>
-              <td><a class="row-link" href="{{ url_for('incidents.page', incident_id=incident.id) }}">{{ incident.monitor.name }}</a></td>
-              <td>{{ pulse(incident_word(incident)) }}</td>
-              <td data-label="Why">{{ error_label(incident.cause) }}</td>
-              <td data-label="Started">{{ incident.opened_at|nice_datetime }}</td>
-              <td class="num" data-label="How long">{{ incident_duration(incident)|duration }}</td>
-            </tr>
+    {% if open_rows %}
+      <section class="section">
+        <div class="card-head"><h2>Down Now</h2></div>
+        {{ incident_table(open_rows) }}
+      </section>
+    {% endif %}
+    {% if groups %}
+      <section class="section">
+        <div class="card-head"><h2>Resolved, by Monitor</h2></div>
+        <div class="groups">
+          {% for monitor, found, seconds in groups %}
+            <details class="incident-group">
+              <summary>
+                <span class="group-name">{{ monitor.name }}</span>
+                <span class="group-facts">{{ plural(found|length, 'incident') }} · down {{ seconds|duration }} in all · last {{ found[0].opened_at|nice_datetime }}</span>
+              </summary>
+              {{ incident_table(found, with_monitor=False) }}
+            </details>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
+        </div>
+      </section>
+    {% endif %}
   {% endif %}
 {% endblock %}
