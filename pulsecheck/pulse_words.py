@@ -62,7 +62,7 @@ ALERT = {
 WORKER = {
     "on": Word("On Duty", "Working: it wrote its heartbeat in the last 2 minutes.", "steady"),
     "quiet": Word("Gone Quiet", "No heartbeat for over 6 minutes (a worker with nothing to do writes one at least "
-                                "every 5). It may be stuck, or stopping.", "weak"),
+                                "every 5). It may be stuck, or stopping.", "alarm"),
     "off": Word("Off Duty", "Stopped: on purpose, or it has written no heartbeat for 15 minutes (the app restarted).",
                 "quiet"),
 }

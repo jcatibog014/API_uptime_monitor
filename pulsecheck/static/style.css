@@ -125,7 +125,10 @@
 /* ---------- Base ---------- */
 
 *, *::before, *::after { box-sizing: border-box; }
-html { font-size: 100%; -webkit-text-size-adjust: 100%; }
+html { font-size: 100%; -webkit-text-size-adjust: 100%; scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 6px; }
 @media (min-width: 1600px) { html { font-size: 106.25%; } }
 @media (min-width: 1920px) { html { font-size: 112.5%; } }
 @media (min-width: 2300px) { html { font-size: 125%; } }
@@ -242,8 +245,11 @@ html:not(.js) .js-only { display: none !important; }
 }
 @media (max-width: 55.99rem) {
   .app { flex-direction: column; }
-  .sidebar { padding: .6rem clamp(1rem, 3vw, 2.5rem); }
-  .sidebar-screen { padding: .55rem .75rem; }
+  .sidebar { padding: .4rem clamp(1rem, 3vw, 2.5rem); }
+  .sidebar-screen { padding: .35rem .6rem; }
+  .sidebar .logo { font-size: 1.1rem; }
+  .sidebar .logo-mark { width: 30px; height: 30px; }
+  .sidebar .menu-button { width: 2.3rem; height: 2.3rem; }
   .sidebar-screen .trace { display: none; }
   .js .sidebar-menu:not(.is-open) { display: none; }
   .sidebar-menu { padding-bottom: .8rem; }
@@ -321,6 +327,8 @@ html:not(.js) .js-only { display: none !important; }
 .pulse-rest { background: var(--pulse-rest-bg); color: var(--pulse-rest-ink); } .pulse-rest::before { background: var(--pulse-rest-lamp); }
 /* Waiting for its first check: the lamp breathes, so it reads as "on its way", not stuck. */
 .pulse-wait { background: var(--pulse-quiet-bg); color: var(--pulse-quiet-ink); }
+/* Something needs you now (a worker gone quiet): a solid pill, white on dark orange (5.2:1). */
+.pulse-alarm { background: #c2410c; color: #fff; } .pulse-alarm::before { background: #fff; }
 .pulse-wait::before { animation: waiting 1.6s ease-in-out infinite; }
 @keyframes waiting { 50% { opacity: .25; } }
 @keyframes beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.45); } 24% { transform: scale(1); } 36% { transform: scale(1.25); } 48% { transform: scale(1); } }
@@ -523,6 +531,8 @@ tbody tr:hover { background: var(--row-hover); }
 
 /* ---------- Insights ---------- */
 
+.why-tag { display: inline-block; padding: .15rem .5rem; border-radius: var(--radius-small); background: var(--pulse-flat-bg); color: var(--pulse-flat-ink); font-size: .85rem; font-weight: 600; }
+.stat-note .then { display: block; font-size: .8rem; }
 .delta { display: inline-flex; align-items: center; gap: .2rem; font-size: .88rem; font-weight: 600; }
 .delta-better { color: var(--ok); }
 .delta-worse { color: var(--danger); }
@@ -622,7 +632,8 @@ html:not(.js) .handle-cell { display: none; }
 .banner-warn { background: var(--pulse-weak-bg); color: var(--pulse-weak-ink); border-color: color-mix(in srgb, var(--pulse-weak-lamp) 45%, transparent); }
 .ping-card { margin-bottom: 1.2rem; }
 .copy-row { display: flex; gap: .6rem; align-items: center; }
-.copy-row input { font-family: var(--font-mono); font-size: .88rem; max-width: none; }
+.copy-row input { font-family: var(--font-mono); font-size: .88rem; max-width: none; min-width: 0; text-overflow: ellipsis; }
+.copy-row .button { flex: 0 0 auto; }
 .spinner { width: 1.1rem; height: 1.1rem; border-radius: 50%; border: 2px solid var(--rule); border-top-color: var(--accent); animation: spin .9s linear infinite; flex: 0 0 auto; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
@@ -645,4 +656,24 @@ html:not(.js) .handle-cell { display: none; }
   .fit-table td[data-label]:not(:first-child)::before { content: attr(data-label) " "; font: 700 .68rem/1 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .fit-table td.num { text-align: left; }
   .table-wrap:has(.fit-table) { overflow-x: visible; }
+}
+
+/* ---------- Phones: the rest ---------- */
+@media (max-width: 40rem) {
+  /* The title keeps its line; buttons that don't fit go under it. */
+  .page-head { flex-wrap: wrap; padding-top: 1.1rem; }
+  .page-head h1 { flex: 1 0 auto; max-width: 100%; }
+  .page-head .head-actions { margin-left: 0; justify-content: flex-start; }
+  /* The main number first and across the top; the rest two by two under it. */
+  .stats { grid-template-columns: 1fr 1fr; }
+  .stat-lead { grid-column: 1 / -1; order: -1; }
+  .stat .readout { font-size: 1.45rem; white-space: nowrap; }
+  .stat-lead .readout { font-size: 1.9rem; }
+  /* Buttons at the end of a form fill the line: easy to reach with a thumb. */
+  .form-actions > .button, .form-actions > form { flex: 1 1 auto; }
+  .form-actions > form > .button { width: 100%; }
+  /* A channel: Send a test takes half, Pause and Delete share the other half. */
+  .channel-actions > form:first-child { flex: 1 1 100%; max-width: calc(50% - .3rem); }
+  .channel-actions > form { flex: 1 1 0; }
+  .hide-phone { display: none !important; }
 }

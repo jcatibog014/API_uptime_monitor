@@ -220,4 +220,4 @@ def test_the_demo_shows_the_smarter_checks(app):
         assert s.scalar(select(Check).where(Check.monitor_id == search.id, Check.slow.is_(True))) is not None
     assert "Its Address" in words(client.get(f"/monitors/{backup.id}"))
     assert "certificate runs out in 9 days" in words(client.get("/alerts/inbox"))
-    assert "Slow after" in words(client.get(f"/monitors/{search.id}"))
+    assert "Slow alert" in words(client.get(f"/monitors/{search.id}"))

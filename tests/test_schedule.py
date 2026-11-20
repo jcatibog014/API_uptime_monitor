@@ -299,6 +299,8 @@ def test_a_worker_is_quiet_then_stopped_and_an_empty_crew_raises_the_alarm(app, 
                                    last_seen=now - timedelta(minutes=minutes_ago)), now)
     # Idle workers write a heartbeat at least every 5 minutes, so 5 minutes is still on duty.
     assert (state(1), state(5), state(7), state(20)) == ("on", "on", "quiet", "off")
+    from pulsecheck import pulse_words
+    assert pulse_words.WORKER["quiet"].tone == "alarm"  # a solid pill: it needs you
     client, _ = owner
     with app.app_context():
         s = db.session()

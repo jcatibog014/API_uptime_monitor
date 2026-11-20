@@ -26,8 +26,8 @@
     {{ field('name', 'Name', values.name, errors.name, hint='What you call it', attrs='required maxlength="80" autofocus') }}
 
     {% if kind == 'practice' %}
-      {{ select('service', 'Practice service', services, values.service, errors.service,
-                hint='The demo checks pretend services, never real sites') }}
+      {{ select('service', 'Service', services, values.service, errors.service,
+                hint='Practice ones: the demo never checks real sites') }}
     {% elif kind == 'tcp' %}
       <div class="form-row">
         {{ field('host', 'Server', values.host, errors.host, hint='A name or an address', attrs='required maxlength="250" autocomplete="off" spellcheck="false" placeholder="db.example.com"') }}
@@ -51,7 +51,7 @@
       <div class="form-row">
         {{ select('interval_s', 'How often', intervals, values.interval_s, errors.interval_s) }}
         {{ select('timeout_s', 'Wait for an answer', timeouts, values.timeout_s, errors.timeout_s, hint='Then it is down') }}
-        {{ select('slow_ms', 'Slow after', slow_limits, values.slow_ms, errors.slow_ms, hint='A Weak Pulse') }}
+        {{ select('slow_ms', 'Slow alert', slow_limits, values.slow_ms, errors.slow_ms, hint='Slower than this') }}
       </div>
     {% endif %}
 

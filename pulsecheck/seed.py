@@ -101,8 +101,9 @@ def build(s, now):
     s.flush()
     for extra in extras:
         extra(s, workspace, by_service, start, now)
+    # The key holds the moment too: a local SQLite file made before AUTOINCREMENT reuses ids.
     queue.enqueue(s, "demo_history", {"workspace_id": workspace.id, "start": start.isoformat()}, run_at=now,
-                  priority=1, max_attempts=2, dedupe_key=f"demo-history:{workspace.id}")
+                  priority=1, max_attempts=2, dedupe_key=f"demo-history:{workspace.id}:{now.isoformat()}")
     return user
 
 
