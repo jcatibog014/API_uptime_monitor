@@ -115,7 +115,7 @@
           <dt>Next check</dt><dd>{% if monitor.paused %}Paused{% elif monitor.next_check_at %}{{ monitor.next_check_at|clock }} ({{ monitor.next_check_at|from_now }}){% else %}–{% endif %}</dd>
           <dt>Wait</dt><dd>{{ monitor.timeout_s }} seconds{% if monitor.sleepy %}, or 90 for a sleepy site{% endif %}</dd>
           {% if monitor.kind == 'http' %}<dt>Good answers</dt><dd>{{ monitor.expected_statuses }}</dd>{% endif %}
-          {% if monitor.slow_ms %}<dt>Slow after</dt><dd>{{ monitor.slow_ms|ms }}</dd>{% endif %}
+          {% if monitor.slow_ms %}<dt>Slow alert</dt><dd>{{ monitor.slow_ms|ms }}</dd>{% endif %}
           {% for key, label in [('contains', 'Must contain'), ('not_contains', 'Must not contain'), ('header', 'Must have the header')] %}
             {% if monitor.assertions and monitor.assertions.get(key) %}<dt>{{ label }}</dt><dd><code>{{ monitor.assertions[key] }}</code></dd>{% endif %}
           {% endfor %}
@@ -155,7 +155,7 @@
             <tr>
               <td><a class="row-link" href="{{ url_for('incidents.page', incident_id=incident.id) }}">{{ incident.opened_at|nice_datetime }}</a></td>
               <td>{{ pulse(incident_word(incident)) }}</td>
-              <td data-label="Why">{{ error_label(incident.cause) }}</td>
+              <td data-label="Why"><span class="why-tag">{{ error_label(incident.cause) }}</span></td>
               <td class="num" data-label="How long">{{ incident_duration(incident)|duration }}</td>
             </tr>
           {% endfor %}

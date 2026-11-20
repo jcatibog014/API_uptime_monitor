@@ -14,7 +14,10 @@
       {% for page in pages %}
         <article class="card">
           <div class="channel-head"><h3>{{ page.name }}</h3></div>
-          <p class="address">{{ config.BASE_URL }}/status/{{ page.slug }}</p>
+          <div class="copy-row">
+            <input class="address" type="text" id="status-url-{{ page.id }}" value="{{ config.BASE_URL }}/status/{{ page.slug }}" readonly aria-label="The page's address">
+            <button class="button button-quiet button-small" type="button" data-copy="status-url-{{ page.id }}" hidden>Copy</button>
+          </div>
           <p class="muted small top-gap-small">{{ plural(page.entries|length, 'monitor') }} on it</p>
           <div class="form-actions start top-gap">
             <a class="button button-small" href="{{ url_for('public.show', slug=page.slug) }}">{{ icon('eye', 16) }} Open the page</a>

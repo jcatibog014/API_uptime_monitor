@@ -118,7 +118,7 @@ def test_every_page_of_the_demo_shows_an_example(app):
         f"/incidents/{incident.id}": ["What Happened", "Checks During the Incident"],
         "/crew": ["Workers", "Dead Letters"],
         "/settings": ["Lakbay Travel", "in a demo"],
-        "/monitors/new": ["Practice service"],
+        "/monitors/new": ["Practice ones: the demo never checks real sites"],
     }
     for url, expected in pages.items():
         response = client.get(url)

@@ -28,7 +28,7 @@
               {% if channel.last_sent_at %} · last alert {{ channel.last_sent_at|ago }}{% endif %}
             </p>
             {% if channel.last_error %}<p class="field-error small">{{ channel.last_error }}</p>{% endif %}
-            <div class="form-actions start top-gap">
+            <div class="form-actions start top-gap channel-actions">
               <form method="post" action="{{ url_for('alerts.test', channel_id=channel.id) }}">{{ csrf() }}<button class="button button-small" type="submit">{{ icon('send', 16) }} Send a test</button></form>
               <form method="post" action="{{ url_for('alerts.toggle', channel_id=channel.id) }}">{{ csrf() }}<button class="button button-quiet button-small" type="submit">{{ 'Resume' if not channel.enabled else 'Pause' }}</button></form>
               <form method="post" action="{{ url_for('alerts.remove', channel_id=channel.id) }}" data-confirm="Delete {{ channel.name }}? Its alerts stop.">{{ csrf() }}<button class="button button-danger button-small" type="submit">Delete</button></form>

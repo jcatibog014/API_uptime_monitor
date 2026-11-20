@@ -51,7 +51,7 @@
           <tbody>
             {% for row, name, state in workers %}
               <tr>
-                <td><strong>{{ name }}</strong><span class="cell-sub muted small">Since {{ row.started_at|nice_datetime }}</span></td>
+                <td><strong>{{ name }}</strong><span class="cell-sub muted small hide-phone">Since {{ row.started_at|nice_datetime }}</span></td>
                 <td>{{ pulse(worker_word(state)) }}</td>
                 <td class="num" data-label="Jobs">{{ row.jobs_done|number }}</td>
                 <td data-label="Heartbeat">{{ row.last_seen|ago }}</td>

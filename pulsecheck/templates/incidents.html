@@ -14,7 +14,7 @@
             {% else %}
               <td><a class="row-link" href="{{ url_for('incidents.page', incident_id=incident.id) }}">{{ incident.opened_at|nice_datetime }}</a></td>
             {% endif %}
-            <td data-label="Why">{{ error_label(incident.cause) }}</td>
+            <td data-label="Why"><span class="why-tag">{{ error_label(incident.cause) }}</span></td>
             {% if with_monitor %}<td data-label="Started">{{ incident.opened_at|nice_datetime }}</td>{% endif %}
             <td class="num" data-label="How long">{{ incident_duration(incident)|duration }}</td>
           </tr>

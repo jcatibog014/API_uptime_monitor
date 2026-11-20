@@ -104,6 +104,11 @@ The Crew page shows the workers, how late the checks are, and the jobs that gave
   <img src="docs/screenshots/phone-status-page.png" alt="A status page on a phone" width="300">
 </p>
 
+<p>
+  <img src="docs/screenshots/phone-incidents.png" alt="Incidents on a phone, grouped by monitor" width="300">
+  <img src="docs/screenshots/phone-alerts.png" alt="Alert channels on a phone" width="300">
+</p>
+
 ## How It Is Made
 
 | Part | What it is | What it does here |
